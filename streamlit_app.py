@@ -29,45 +29,82 @@ def identify_furnace_type(text_to_search):
     return furnace_id
 
 # ==============================================================================
-# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) และ Model Pitch
+# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) อัปเดตล่าสุด และ Model Pitch
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
-        {"name": "Dryer Z#1", "len": 3.15, "type": "Dryer"}, {"name": "Dryer Z#2", "len": 3.13, "type": "Dryer"},
-        {"name": "EXT Dryer", "len": 0.70, "type": "Dryer"}, {"name": "ENT DB", "len": 0.67, "type": "Debinder"},
-        {"name": "DB Z#1", "len": 3.13, "type": "Debinder"}, {"name": "DB Z#2", "len": 2.60, "type": "Debinder"},
-        {"name": "DB Z#3", "len": 2.60, "type": "Debinder"}, {"name": "DB Z#4", "len": 3.13, "type": "Debinder"},
-        {"name": "XFER#1", "len": 2.71, "type": "Xfer"}, {"name": "Z#1", "len": 3.14, "type": "Heating"},
-        {"name": "Z#2", "len": 2.68, "type": "Heating"}, {"name": "Z#3", "len": 2.72, "type": "Heating"},
-        {"name": "Z#4", "len": 2.04, "type": "Heating"}, {"name": "Z#5", "len": 2.00, "type": "Heating"},
-        {"name": "Z#6", "len": 2.00, "type": "Heating"}, {"name": "Z#7", "len": 2.29, "type": "Heating"},
-        {"name": "WatCool#1", "len": 2.39, "type": "Cooling"}, {"name": "WatCool#2", "len": 1.90, "type": "Cooling"},
-        {"name": "Exit curtain", "len": 1.90, "type": "Cooling"}, {"name": "XFER#2", "len": 0.45, "type": "Cooling"},
-        {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"}, {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"},
+        {"name": "Entrance", "len": 2.00, "type": "Xfer"},
+        {"name": "Fluxer", "len": 2.70, "type": "Flux"},
+        {"name": "Xfer", "len": 2.18, "type": "Xfer"},
+        {"name": "Dryer Z#1", "len": 6.03, "type": "Dryer"},
+        {"name": "Dryer Z#2", "len": 6.03, "type": "Dryer"},
+        {"name": "EXT Dryer", "len": 0.68, "type": "Dryer"},
+        {"name": "ENT DB", "len": 0.68, "type": "Debinder"},
+        {"name": "DB Z#1", "len": 3.10, "type": "Debinder"},
+        {"name": "DB Z#2", "len": 2.60, "type": "Debinder"},
+        {"name": "DB Z#3", "len": 2.60, "type": "Debinder"},
+        {"name": "DB Z#4", "len": 3.10, "type": "Debinder"},
+        {"name": "XFER#1", "len": 3.00, "type": "Xfer"},
+        {"name": "Z#1", "len": 3.65, "type": "Heating"},
+        {"name": "Z#2", "len": 2.68, "type": "Heating"},
+        {"name": "Z#3", "len": 2.36, "type": "Heating"},
+        {"name": "Z#4", "len": 2.02, "type": "Heating"},
+        {"name": "Z#5", "len": 2.01, "type": "Heating"},
+        {"name": "Z#6", "len": 1.84, "type": "Heating"},
+        {"name": "Z#7", "len": 2.81, "type": "Heating"},
+        {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
+        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
+        {"name": "Exit curtain", "len": 2.10, "type": "Cooling"},
+        {"name": "XFER#2", "len": 0.40, "type": "Cooling"},
+        {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"},
         {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB2": [
-        {"name": "Xfer", "len": 2.00, "type": "Xfer"}, {"name": "Flux spray", "len": 4.70, "type": "Flux"},
-        {"name": "Xfer", "len": 2.50, "type": "Xfer"}, {"name": "DryOFF-Z#1", "len": 2.80, "type": "Dryer"},
-        {"name": "DryOFF-Z#2", "len": 2.80, "type": "Dryer"}, {"name": "Xfer1", "len": 3.13, "type": "Xfer"},
-        {"name": "Z#1", "len": 3.60, "type": "Heating"}, {"name": "Z#2", "len": 2.70, "type": "Heating"},
-        {"name": "Z#3", "len": 2.40, "type": "Heating"}, {"name": "Z#4", "len": 2.10, "type": "Heating"},
-        {"name": "Z#5", "len": 2.30, "type": "Heating"}, {"name": "Z#6", "len": 1.90, "type": "Heating"},
-        {"name": "Z#7", "len": 2.20, "type": "Heating"}, {"name": "Xfer2", "len": 0.80, "type": "Cooling"},
-        {"name": "WatCol1", "len": 1.75, "type": "Cooling"}, {"name": "WatCol2", "len": 1.85, "type": "Cooling"},
-        {"name": "Xfer3", "len": 2.30, "type": "Cooling"}, {"name": "Airc1", "len": 1.25, "type": "Cooling"},
-        {"name": "Airc2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.80, "type": "Exit"}
+        {"name": "Entrance", "len": 2.02, "type": "Xfer"},
+        {"name": "Fluxer", "len": 4.70, "type": "Flux"},
+        {"name": "Xfer", "len": 2.00, "type": "Xfer"},
+        {"name": "Flux spray", "len": 4.70, "type": "Flux"},
+        {"name": "Xfer", "len": 2.50, "type": "Xfer"},
+        {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
+        {"name": "DryOFF-Z#2", "len": 2.83, "type": "Dryer"},
+        {"name": "Xfer1", "len": 3.00, "type": "Xfer"},
+        {"name": "Z#1", "len": 3.65, "type": "Heating"},
+        {"name": "Z#2", "len": 2.68, "type": "Heating"},
+        {"name": "Z#3", "len": 2.36, "type": "Heating"},
+        {"name": "Z#4", "len": 2.02, "type": "Heating"},
+        {"name": "Z#5", "len": 2.01, "type": "Heating"},
+        {"name": "Z#6", "len": 1.84, "type": "Heating"},
+        {"name": "Z#7", "len": 2.81, "type": "Heating"},
+        {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
+        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
+        {"name": "Exit curtain", "len": 2.10, "type": "Cooling"},
+        {"name": "XFER#2", "len": 0.40, "type": "Cooling"},
+        {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"},
+        {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB3": [
-        {"name": "XFER", "len": 0.10, "type": "Xfer"}, {"name": "Dryer#1", "len": 1.85, "type": "Dryer"},
-        {"name": "Dryer#2", "len": 1.85, "type": "Dryer"}, {"name": "Dryer#3", "len": 1.95, "type": "Dryer"},
-        {"name": "XFER#1", "len": 3.39, "type": "Xfer"}, {"name": "Z#1", "len": 3.60, "type": "Heating"},
-        {"name": "Z#2", "len": 2.75, "type": "Heating"}, {"name": "Z#3", "len": 2.30, "type": "Heating"},
-        {"name": "Z#4", "len": 2.10, "type": "Heating"}, {"name": "Z#5", "len": 2.10, "type": "Heating"},
-        {"name": "Z#6", "len": 1.90, "type": "Heating"}, {"name": "Z#7", "len": 1.63, "type": "Heating"},
-        {"name": "WatCool#1", "len": 2.56, "type": "Cooling"}, {"name": "WatCool#2", "len": 1.90, "type": "Cooling"},
-        {"name": "Exit curtain", "len": 2.35, "type": "Cooling"}, {"name": "AirCool#1", "len": 1.25, "type": "Cooling"},
-        {"name": "AirCool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
+        {"name": "Entrance", "len": 0.90, "type": "Xfer"},
+        {"name": "Fluxer", "len": 4.05, "type": "Flux"},
+        {"name": "XFER", "len": 2.52, "type": "Xfer"},
+        {"name": "Dryer#1", "len": 1.88, "type": "Dryer"},
+        {"name": "Dryer#2", "len": 1.88, "type": "Dryer"},
+        {"name": "Dryer#3", "len": 1.88, "type": "Dryer"},
+        {"name": "XFER#1", "len": 3.00, "type": "Xfer"},
+        {"name": "Z#1", "len": 3.65, "type": "Heating"},
+        {"name": "Z#2", "len": 2.68, "type": "Heating"},
+        {"name": "Z#3", "len": 2.36, "type": "Heating"},
+        {"name": "Z#4", "len": 2.02, "type": "Heating"},
+        {"name": "Z#5", "len": 2.01, "type": "Heating"},
+        {"name": "Z#6", "len": 1.84, "type": "Heating"},
+        {"name": "Z#7", "len": 2.81, "type": "Heating"},
+        {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
+        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
+        {"name": "Exit curtain", "len": 2.50, "type": "Cooling"},
+        {"name": "AirCool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "AirCool#2", "len": 1.25, "type": "Cooling"},
+        {"name": "Exit", "len": 1.85, "type": "Exit"}
     ]
 }
 
@@ -124,26 +161,23 @@ st.title("🔥 Furnace Product & Simulation")
 st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) อ้างอิงจากระยะ Pitch ของโมเดลและความยาวโซนเตา")
 
 # ==============================================================================
-# --- เพิ่มส่วนอัปโหลดไฟล์ Excel แบบป้องกันนามสกุลอื่น ---
+# --- ส่วนอัปโหลดไฟล์ Excel แบบป้องกันนามสกุลอื่น ---
 # ==============================================================================
 st.markdown("### 📥 อัปโหลดแผนการผลิต (Excel)")
 uploaded_excels = st.file_uploader(
     "อัปโหลดไฟล์ข้อมูลแผนการผลิต (.xlsx หรือ .xls สามารถเลือกหลายไฟล์พร้อมกันได้)", 
-    type=["xlsx", "xls"], # กำหนด type ให้รับแค่ไฟล์ Excel ระบบจะป้องกันไฟล์อื่นให้อัตโนมัติ
+    type=["xlsx", "xls"], 
     accept_multiple_files=True
 )
 
 if uploaded_excels:
     st.success(f"✅ อัปโหลดไฟล์ Excel สำเร็จจำนวน {len(uploaded_excels)} ไฟล์")
     
-    # ซ่อนส่วนพรีวิวข้อมูลไว้ใน expander เพื่อไม่ให้รกหน้าจอหลัก
     with st.expander("ดูตัวอย่างข้อมูลที่อัปโหลด (Data Preview)"):
         for file in uploaded_excels:
             try:
-                # อ่านไฟล์ Excel
                 df_preview = pd.read_excel(file)
                 st.write(f"📄 **ไฟล์:** `{file.name}`")
-                # แสดงผลข้อมูลทั้งหมดใน Dataframe โดยไม่ได้ใช้ .head(5) แล้ว
                 st.dataframe(df_preview, use_container_width=True) 
             except Exception as e:
                 st.error(f"ไม่สามารถอ่านไฟล์ {file.name} ได้: {e}")
@@ -205,13 +239,13 @@ for idx, row in df_zones.iterrows():
         font=dict(size=11, color="black" if row["Type"] in ["Dryer", "Xfer", "Cooling"] else "white")
     )
 
-# วาดเส้นแกนสายพาน (Conveyor Line) รองรับชิ้นงาน
+# วาดเส้นแกนสายพาน (Conveyor Line) รองรับชิ้นงาน (อยู่ด้านบนที่ตำแหน่ง y=1.2)
 fig.add_shape(
     type="line", x0=0, x1=total_furnace_length, y0=1.2, y1=1.2,
     line=dict(color="gray", width=2, dash="dot"), layer="below"
 )
 
-# วาดชิ้นงาน (Product Markers) ยกขึ้นไปไว้ด้านบนที่ระยะ y=1.2
+# วาดชิ้นงาน (Product Markers) ยกขึ้นไปไว้ด้านบนที่ระยะ y=1.2 ไม่ให้บังตัวหนังสือ
 fig.add_trace(go.Scatter(
     x=product_positions, y=[1.2] * len(product_positions),
     mode="markers", name=f"ชิ้นงาน {selected_model}",
