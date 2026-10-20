@@ -53,7 +53,7 @@ if uploaded_file is not None:
     elif current_nb == "NB2":
         st.info("✅ โหลดไทม์ไลน์และตั้งค่าสำหรับเตา NB2")
         # แสดงภาพของ NB2 (ภาพกลาง)
-        st.image("image_c5aa27.png", caption="Brazing Line - NB2", use_container_width=True)
+        st.image("Screenshot 2026-10-20 144037.png", caption="Brazing Line - NB2", use_container_width=True)
         
     elif current_nb == "NB3":
         st.warning("✅ โหลดไทม์ไลน์และตั้งค่าสำหรับเตา NB3")
