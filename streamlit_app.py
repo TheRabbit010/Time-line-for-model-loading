@@ -47,16 +47,18 @@ if uploaded_file is not None:
     # แสดงผลรูปภาพ/ไทม์ไลน์ ตาม NB ที่แยกได้
     if current_nb == "NB1":
         st.success("✅ โหลดไทม์ไลน์และตั้งค่าสำหรับเตา NB1")
-        # ยกเลิกคอมเมนต์บรรทัดด้านล่างเพื่อแสดงรูป หากมีไฟล์รูปภาพอยู่ในโฟลเดอร์เดียวกัน
-        # st.image("nb1_brazing_line.png", caption="Brazing Line - NB1", use_container_width=True)
+        # แสดงภาพของ NB1 (ภาพซ้าย)
+        st.image("image_c55827.png", caption="Brazing Line - NB1", use_container_width=True)
         
     elif current_nb == "NB2":
         st.info("✅ โหลดไทม์ไลน์และตั้งค่าสำหรับเตา NB2")
-        # st.image("nb2_brazing_line.png", caption="Brazing Line - NB2", use_container_width=True)
+        # แสดงภาพของ NB2 (ภาพกลาง)
+        st.image("image_c5aa27.png", caption="Brazing Line - NB2", use_container_width=True)
         
     elif current_nb == "NB3":
         st.warning("✅ โหลดไทม์ไลน์และตั้งค่าสำหรับเตา NB3")
-        # st.image("nb3_brazing_line.png", caption="Brazing Line - NB3", use_container_width=True)
+        # แสดงภาพของ NB3 (ภาพขวา)
+        st.image("image_c5aa7e.png", caption="Brazing Line - NB3", use_container_width=True)
 
 else:
     st.info("กรุณาอัปโหลดไฟล์ .PAQ เพื่อเริ่มต้นการทำงาน")
