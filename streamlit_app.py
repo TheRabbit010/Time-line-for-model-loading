@@ -98,150 +98,134 @@ IMAGE_MAPPING = {
 # ==============================================================================
 # 3. ส่วนของหน้าจอ Streamlit (UI)
 # ==============================================================================
-st.set_page_config(page_title="Furnace Timeline Tracker", page_icon="🔥", layout="wide")
-
-st.title("🔥 Furnace Timeline Tracker & Simulation")
-st.markdown("ระบบวิเคราะห์และจำลองตำแหน่งชิ้นงานในกระบวนการเตาอบประสาน (Brazing Furnace)")
-
-# สร้าง Tabs หลัก
-tab1, tab2 = st.tabs(["📂 File Upload & Layout", "🚚 Furnace Product Simulation"])
+st.set_page_config(page_title="Furnace Product Simulation", page_icon="🔥", layout="wide")
 
 current_nb = "NB3" # Default fallback
 
 # ------------------------------------------------------------------------------
-# TAB 1: อัปโหลดไฟล์และแสดงรูป Layout
+# Sidebar: อัปโหลดไฟล์ .PAQ
 # ------------------------------------------------------------------------------
-with tab1:
+with st.sidebar:
     st.markdown("### 1. อัปโหลดไฟล์ข้อมูล Datapaq (.PAQ)")
     uploaded_file = st.file_uploader("📂 ลากไฟล์ .PAQ มาวางที่นี่", type=["paq"])
 
     if uploaded_file is not None:
         filename = uploaded_file.name
         current_nb = identify_furnace_type(filename)
-        
-        st.success(f"✅ อัปโหลดไฟล์สำเร็จ: `{filename}`")
+        st.success(f"✅ อัปโหลดไฟล์สำเร็จ:\n`{filename}`")
         st.info(f"📍 ตรวจพบว่าเป็นเตา: **{current_nb}**")
-        
-        # แสดงรูปภาพ Layout ตามที่ตรวจจับได้
-        img_file = IMAGE_MAPPING.get(current_nb)
-        
-        if os.path.exists(img_file):
-            st.image(img_file, caption=f"Brazing Line Layout - {current_nb}", use_container_width=True)
-        else:
-            st.warning(f"⚠️ ไม่พบไฟล์รูปภาพ `{img_file}` ในโฟลเดอร์ กรุณานำรูปมาวางไว้ในโฟลเดอร์เดียวกับโค้ด")
     else:
-        st.info("กรุณาอัปโหลดไฟล์ .PAQ เพื่อเริ่มต้นการทำงาน หรือข้ามไปจำลองชิ้นงานที่ Tab 2 ได้เลย")
+        st.info("💡 สามารถอัปโหลดไฟล์ .PAQ เพื่อให้ระบบเลือกเตาให้อัตโนมัติ หรือเลือกเตาเองที่หน้าจอด้านขวาได้เลยครับ")
 
 # ------------------------------------------------------------------------------
-# TAB 2: จำลองตำแหน่งชิ้นงาน (2D Simulation)
+# Main Page: จำลองตำแหน่งชิ้นงาน (Simulation)
 # ------------------------------------------------------------------------------
-with tab2:
-    st.markdown("### 2. จำลองตำแหน่งชิ้นงานในเตาแบบอัตโนมัติ")
-    st.markdown("อ้างอิงจากระยะ Pitch ของโมเดลและความยาวของแต่ละ Zone ในเตา")
-    
-    col1, col2 = st.columns(2)
-    
-    # เลือกเตา (กำหนด Default เป็นเตาที่ตรวจเจอจากการอัปโหลด)
-    furnace_options = ["NB1", "NB2", "NB3"]
-    default_index = furnace_options.index(current_nb) if current_nb in furnace_options else 2
-    
-    with col1:
-        selected_nb = st.selectbox("เลือกเตา (Select Furnace):", furnace_options, index=default_index)
-    with col2:
-        selected_model = st.selectbox("เลือกโมเดล (Select Model):", MODEL_DB["Model"].tolist())
+st.title("🔥 Furnace Product & Simulation")
+st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) อ้างอิงจากระยะ Pitch ของโมเดลและความยาวโซนเตา")
 
-    # ดึงค่า Pitch
-    pitch_mm = MODEL_DB.loc[MODEL_DB["Model"] == selected_model, "Pitch (mm)"].values[0]
-    pitch_m = pitch_mm / 1000.0
+col1, col2 = st.columns(2)
 
-    st.success(f"📍 **Model:** {selected_model} | **ระยะห่างต่อชิ้น (Pitch):** {pitch_mm} mm ({pitch_m:.3f} เมตร)")
+# กำหนด Default เป็นเตาที่ตรวจเจอจากการอัปโหลด (ถ้ามี)
+furnace_options = ["NB1", "NB2", "NB3"]
+default_index = furnace_options.index(current_nb) if current_nb in furnace_options else 2
 
-    # คำนวณความยาวสะสมของแต่ละ Zone
-    zones = FURNACE_ZONE_DATA[selected_nb]
-    cumulative_len = 0
-    furnace_zones_df = []
+with col1:
+    selected_nb = st.selectbox("1. เลือกเตา (Select Furnace):", furnace_options, index=default_index)
+with col2:
+    selected_model = st.selectbox("2. เลือกโมเดลที่รัน (Select Model):", MODEL_DB["Model"].tolist())
 
-    for z in zones:
-        start = cumulative_len
-        end = cumulative_len + z["len"]
-        furnace_zones_df.append({
-            "Name": z["name"], "Type": z["type"], "Length": z["len"], 
-            "Start": start, "End": end
-        })
-        cumulative_len = end
+# ดึงค่า Pitch
+pitch_mm = MODEL_DB.loc[MODEL_DB["Model"] == selected_model, "Pitch (mm)"].values[0]
+pitch_m = pitch_mm / 1000.0
 
-    total_furnace_length = cumulative_len
-    df_zones = pd.DataFrame(furnace_zones_df)
+st.success(f"📍 **Model:** {selected_model} | **ระยะห่างต่อชิ้น (Pitch):** {pitch_mm} mm ({pitch_m:.3f} เมตร)")
 
-    # สร้างตำแหน่งชิ้นงานทั้งหมดในเตา
-    product_positions = np.arange(0, total_furnace_length, pitch_m)
+# คำนวณความยาวสะสมของแต่ละ Zone
+zones = FURNACE_ZONE_DATA[selected_nb]
+cumulative_len = 0
+furnace_zones_df = []
 
-    # วาดกราฟ 2D Map โครงสร้างเตา
-    fig = go.Figure()
+for z in zones:
+    start = cumulative_len
+    end = cumulative_len + z["len"]
+    furnace_zones_df.append({
+        "Name": z["name"], "Type": z["type"], "Length": z["len"], 
+        "Start": start, "End": end
+    })
+    cumulative_len = end
 
-    # วาดแถบของแต่ละ Zone
-    for idx, row in df_zones.iterrows():
-        fig.add_shape(
-            type="rect", x0=row["Start"], x1=row["End"], y0=0, y1=1,
-            fillcolor=ZONE_COLORS.get(row["Type"], "#ccc"), line=dict(color="white", width=1),
-            layer="below"
-        )
-        # ใส่ชื่อ Zone กึ่งกลาง
-        fig.add_annotation(
-            x=(row["Start"] + row["End"]) / 2, y=0.5,
-            text=row["Name"], showarrow=False, textangle=-90,
-            font=dict(size=11, color="black" if row["Type"] in ["Dryer", "Xfer", "Cooling"] else "white")
-        )
+total_furnace_length = cumulative_len
+df_zones = pd.DataFrame(furnace_zones_df)
 
-    # วาดชิ้นงาน (Product Markers) ทับลงไป
-    fig.add_trace(go.Scatter(
-        x=product_positions, y=[0.5] * len(product_positions), # ให้อยู่กึ่งกลางความสูง
-        mode="markers", name=f"ชิ้นงาน {selected_model}",
-        marker=dict(symbol="square", size=12, color="#32CD32", line=dict(width=2, color="black")),
-        hovertemplate="ตำแหน่ง: %{x:.2f} เมตร<extra></extra>"
-    ))
+# สร้างตำแหน่งชิ้นงานทั้งหมดในเตา
+product_positions = np.arange(0, total_furnace_length, pitch_m)
 
-    # นำภาพเตาขึ้นไปวางด้านบนโครงสร้าง (ถ้ามีไฟล์)
-    img_file_sim = IMAGE_MAPPING.get(selected_nb)
-    y_range = [-0.2, 1.2]
-    
-    if os.path.exists(img_file_sim):
-        img = Image.open(img_file_sim)
-        fig.add_layout_image(
-            dict(
-                source=img, xref="x", yref="y",
-                x=0, y=2.5, sizex=total_furnace_length, sizey=1.5,
-                sizing="stretch", opacity=1, layer="above"
-            )
-        )
-        y_range = [-0.2, 2.6] # ขยายแกน Y เพื่อให้มีพื้นที่แสดงรูปด้านบน
+# วาดกราฟ 2D Map โครงสร้างเตา
+fig = go.Figure()
 
-    # ตั้งค่ากราฟให้สวยงาม
-    fig.update_layout(
-        title=f"Furnace Timeline: {selected_nb} (Total Length: {total_furnace_length:.2f} m)",
-        xaxis=dict(title="Distance (Meters)", range=[0, total_furnace_length], tickmode="linear", tick0=0, dtick=2),
-        yaxis=dict(visible=False, range=y_range),
-        height=400, margin=dict(l=20, r=20, t=50, b=40),
-        template="plotly_white", hovermode="x unified",
-        showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+# วาดแถบของแต่ละ Zone
+for idx, row in df_zones.iterrows():
+    fig.add_shape(
+        type="rect", x0=row["Start"], x1=row["End"], y0=0, y1=1,
+        fillcolor=ZONE_COLORS.get(row["Type"], "#ccc"), line=dict(color="white", width=1),
+        layer="below"
+    )
+    # ใส่ชื่อ Zone กึ่งกลาง
+    fig.add_annotation(
+        x=(row["Start"] + row["End"]) / 2, y=0.5,
+        text=row["Name"], showarrow=False, textangle=-90,
+        font=dict(size=11, color="black" if row["Type"] in ["Dryer", "Xfer", "Cooling"] else "white")
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+# วาดชิ้นงาน (Product Markers) ทับลงไป
+fig.add_trace(go.Scatter(
+    x=product_positions, y=[0.5] * len(product_positions), # ให้อยู่กึ่งกลางความสูง
+    mode="markers", name=f"ชิ้นงาน {selected_model}",
+    marker=dict(symbol="square", size=12, color="#32CD32", line=dict(width=2, color="black")),
+    hovertemplate="ตำแหน่ง: %{x:.2f} เมตร<extra></extra>"
+))
 
-    # ==============================================================================
-    # ตารางสรุปจำนวนชิ้นงาน (WIP) ในแต่ละ Zone
-    # ==============================================================================
-    st.markdown("### 📋 สรุปจำนวนชิ้นงานที่กำลังอยู่ในแต่ละกระบวนการ (WIP)")
-    
-    # คำนวณว่าแต่ละชิ้นงานอยู่ในช่วงของ Zone ใด
-    bins = [0] + df_zones["End"].tolist()
-    labels = df_zones["Name"].tolist()
-    zone_counts = pd.cut(product_positions, bins=bins, labels=labels, right=True).value_counts()
-    
-    df_wip = pd.DataFrame({"Zone / Process": zone_counts.index, "จำนวนชิ้นงาน (ชิ้น)": zone_counts.values})
-    
-    # กรองเอาเฉพาะโซนที่มีชิ้นงานอยู่ (จำนวน > 0)
-    df_wip = df_wip[df_wip["จำนวนชิ้นงาน (ชิ้น)"] > 0]
-    
-    # แปลงตารางให้เป็นแนวนอนเพื่อให้ดูง่ายขึ้นบนหน้าจอ
-    st.dataframe(df_wip.set_index("Zone / Process").T, use_container_width=True)
+# นำภาพเตาขึ้นไปวางด้านบนโครงสร้าง (ถ้ามีไฟล์)
+img_file_sim = IMAGE_MAPPING.get(selected_nb)
+y_range = [-0.2, 1.2]
+
+if os.path.exists(img_file_sim):
+    img = Image.open(img_file_sim)
+    fig.add_layout_image(
+        dict(
+            source=img, xref="x", yref="y",
+            x=0, y=2.5, sizex=total_furnace_length, sizey=1.5,
+            sizing="stretch", opacity=1, layer="above"
+        )
+    )
+    y_range = [-0.2, 2.6] # ขยายแกน Y เพื่อให้มีพื้นที่แสดงรูปด้านบน
+
+# ตั้งค่ากราฟให้สวยงาม
+fig.update_layout(
+    title=f"Furnace Timeline: {selected_nb} (Total Length: {total_furnace_length:.2f} m)",
+    xaxis=dict(title="Distance (Meters)", range=[0, total_furnace_length], tickmode="linear", tick0=0, dtick=2),
+    yaxis=dict(visible=False, range=y_range),
+    height=400, margin=dict(l=20, r=20, t=50, b=40),
+    template="plotly_white", hovermode="x unified",
+    showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# ==============================================================================
+# ตารางสรุปจำนวนชิ้นงาน (WIP) ในแต่ละ Zone
+# ==============================================================================
+st.markdown("### 📋 สรุปจำนวนชิ้นงานที่กำลังอยู่ในแต่ละกระบวนการ (WIP)")
+
+# คำนวณว่าแต่ละชิ้นงานอยู่ในช่วงของ Zone ใด
+bins = [0] + df_zones["End"].tolist()
+labels = df_zones["Name"].tolist()
+zone_counts = pd.cut(product_positions, bins=bins, labels=labels, right=True).value_counts()
+
+df_wip = pd.DataFrame({"Zone / Process": zone_counts.index, "จำนวนชิ้นงาน (ชิ้น)": zone_counts.values})
+
+# กรองเอาเฉพาะโซนที่มีชิ้นงานอยู่ (จำนวน > 0)
+df_wip = df_wip[df_wip["จำนวนชิ้นงาน (ชิ้น)"] > 0]
+
+# แปลงตารางให้เป็นแนวนอนเพื่อให้ดูง่ายขึ้นบนหน้าจอ
+st.dataframe(df_wip.set_index("Zone / Process").T, use_container_width=True)
