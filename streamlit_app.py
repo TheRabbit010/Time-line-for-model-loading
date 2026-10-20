@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 import numpy as np
 import re
 from PIL import Image
 import os
+from datetime import timedelta
 
 # ==============================================================================
 # 1. ฟังก์ชันสำหรับแยกประเภทเตา (NB1, NB2, NB3) จากชื่อไฟล์
@@ -29,82 +31,48 @@ def identify_furnace_type(text_to_search):
     return furnace_id
 
 # ==============================================================================
-# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) อัปเดตล่าสุด และ Model Pitch
+# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) และ Model Pitch
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
-        {"name": "Entrance", "len": 2.00, "type": "Xfer"},
-        {"name": "Fluxer", "len": 2.70, "type": "Flux"},
-        {"name": "Xfer", "len": 2.18, "type": "Xfer"},
-        {"name": "Dryer Z#1", "len": 6.03, "type": "Dryer"},
-        {"name": "Dryer Z#2", "len": 6.03, "type": "Dryer"},
-        {"name": "EXT Dryer", "len": 0.68, "type": "Dryer"},
-        {"name": "ENT DB", "len": 0.68, "type": "Debinder"},
-        {"name": "DB Z#1", "len": 3.10, "type": "Debinder"},
-        {"name": "DB Z#2", "len": 2.60, "type": "Debinder"},
-        {"name": "DB Z#3", "len": 2.60, "type": "Debinder"},
-        {"name": "DB Z#4", "len": 3.10, "type": "Debinder"},
-        {"name": "XFER#1", "len": 3.00, "type": "Xfer"},
-        {"name": "Z#1", "len": 3.65, "type": "Heating"},
-        {"name": "Z#2", "len": 2.68, "type": "Heating"},
-        {"name": "Z#3", "len": 2.36, "type": "Heating"},
-        {"name": "Z#4", "len": 2.02, "type": "Heating"},
-        {"name": "Z#5", "len": 2.01, "type": "Heating"},
-        {"name": "Z#6", "len": 1.84, "type": "Heating"},
-        {"name": "Z#7", "len": 2.81, "type": "Heating"},
-        {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
-        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
-        {"name": "Exit curtain", "len": 2.10, "type": "Cooling"},
-        {"name": "XFER#2", "len": 0.40, "type": "Cooling"},
-        {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
-        {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"},
-        {"name": "Exit", "len": 1.85, "type": "Exit"}
+        {"name": "Entrance", "len": 2.00, "type": "Xfer"}, {"name": "Fluxer", "len": 2.70, "type": "Flux"},
+        {"name": "Xfer", "len": 2.18, "type": "Xfer"}, {"name": "Dryer Z#1", "len": 6.03, "type": "Dryer"},
+        {"name": "Dryer Z#2", "len": 6.03, "type": "Dryer"}, {"name": "EXT Dryer", "len": 0.68, "type": "Dryer"},
+        {"name": "ENT DB", "len": 0.68, "type": "Debinder"}, {"name": "DB Z#1", "len": 3.10, "type": "Debinder"},
+        {"name": "DB Z#2", "len": 2.60, "type": "Debinder"}, {"name": "DB Z#3", "len": 2.60, "type": "Debinder"},
+        {"name": "DB Z#4", "len": 3.10, "type": "Debinder"}, {"name": "XFER#1", "len": 3.00, "type": "Xfer"},
+        {"name": "Z#1", "len": 3.65, "type": "Heating"}, {"name": "Z#2", "len": 2.68, "type": "Heating"},
+        {"name": "Z#3", "len": 2.36, "type": "Heating"}, {"name": "Z#4", "len": 2.02, "type": "Heating"},
+        {"name": "Z#5", "len": 2.01, "type": "Heating"}, {"name": "Z#6", "len": 1.84, "type": "Heating"},
+        {"name": "Z#7", "len": 2.81, "type": "Heating"}, {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
+        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"}, {"name": "Exit curtain", "len": 2.10, "type": "Cooling"},
+        {"name": "XFER#2", "len": 0.40, "type": "Cooling"}, {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB2": [
-        {"name": "Entrance", "len": 2.02, "type": "Xfer"},
-        {"name": "Fluxer", "len": 4.70, "type": "Flux"},
-        {"name": "Xfer", "len": 2.00, "type": "Xfer"},
-        {"name": "Flux spray", "len": 4.70, "type": "Flux"},
-        {"name": "Xfer", "len": 2.50, "type": "Xfer"},
-        {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
-        {"name": "DryOFF-Z#2", "len": 2.83, "type": "Dryer"},
-        {"name": "Xfer1", "len": 3.00, "type": "Xfer"},
-        {"name": "Z#1", "len": 3.65, "type": "Heating"},
-        {"name": "Z#2", "len": 2.68, "type": "Heating"},
-        {"name": "Z#3", "len": 2.36, "type": "Heating"},
-        {"name": "Z#4", "len": 2.02, "type": "Heating"},
-        {"name": "Z#5", "len": 2.01, "type": "Heating"},
-        {"name": "Z#6", "len": 1.84, "type": "Heating"},
-        {"name": "Z#7", "len": 2.81, "type": "Heating"},
-        {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
-        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
-        {"name": "Exit curtain", "len": 2.10, "type": "Cooling"},
-        {"name": "XFER#2", "len": 0.40, "type": "Cooling"},
-        {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
-        {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"},
-        {"name": "Exit", "len": 1.85, "type": "Exit"}
+        {"name": "Entrance", "len": 2.02, "type": "Xfer"}, {"name": "Fluxer", "len": 4.70, "type": "Flux"},
+        {"name": "Xfer", "len": 2.00, "type": "Xfer"}, {"name": "Flux spray", "len": 4.70, "type": "Flux"},
+        {"name": "Xfer", "len": 2.50, "type": "Xfer"}, {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
+        {"name": "DryOFF-Z#2", "len": 2.83, "type": "Dryer"}, {"name": "Xfer1", "len": 3.00, "type": "Xfer"},
+        {"name": "Z#1", "len": 3.65, "type": "Heating"}, {"name": "Z#2", "len": 2.68, "type": "Heating"},
+        {"name": "Z#3", "len": 2.36, "type": "Heating"}, {"name": "Z#4", "len": 2.02, "type": "Heating"},
+        {"name": "Z#5", "len": 2.01, "type": "Heating"}, {"name": "Z#6", "len": 1.84, "type": "Heating"},
+        {"name": "Z#7", "len": 2.81, "type": "Heating"}, {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
+        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"}, {"name": "Exit curtain", "len": 2.10, "type": "Cooling"},
+        {"name": "XFER#2", "len": 0.40, "type": "Cooling"}, {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB3": [
-        {"name": "Entrance", "len": 0.90, "type": "Xfer"},
-        {"name": "Fluxer", "len": 4.05, "type": "Flux"},
-        {"name": "XFER", "len": 2.52, "type": "Xfer"},
-        {"name": "Dryer#1", "len": 1.88, "type": "Dryer"},
-        {"name": "Dryer#2", "len": 1.88, "type": "Dryer"},
-        {"name": "Dryer#3", "len": 1.88, "type": "Dryer"},
-        {"name": "XFER#1", "len": 3.00, "type": "Xfer"},
-        {"name": "Z#1", "len": 3.65, "type": "Heating"},
-        {"name": "Z#2", "len": 2.68, "type": "Heating"},
-        {"name": "Z#3", "len": 2.36, "type": "Heating"},
-        {"name": "Z#4", "len": 2.02, "type": "Heating"},
-        {"name": "Z#5", "len": 2.01, "type": "Heating"},
-        {"name": "Z#6", "len": 1.84, "type": "Heating"},
-        {"name": "Z#7", "len": 2.81, "type": "Heating"},
-        {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
-        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
-        {"name": "Exit curtain", "len": 2.50, "type": "Cooling"},
-        {"name": "AirCool#1", "len": 1.25, "type": "Cooling"},
-        {"name": "AirCool#2", "len": 1.25, "type": "Cooling"},
-        {"name": "Exit", "len": 1.85, "type": "Exit"}
+        {"name": "Entrance", "len": 0.90, "type": "Xfer"}, {"name": "Fluxer", "len": 4.05, "type": "Flux"},
+        {"name": "XFER", "len": 2.52, "type": "Xfer"}, {"name": "Dryer#1", "len": 1.88, "type": "Dryer"},
+        {"name": "Dryer#2", "len": 1.88, "type": "Dryer"}, {"name": "Dryer#3", "len": 1.88, "type": "Dryer"},
+        {"name": "XFER#1", "len": 3.00, "type": "Xfer"}, {"name": "Z#1", "len": 3.65, "type": "Heating"},
+        {"name": "Z#2", "len": 2.68, "type": "Heating"}, {"name": "Z#3", "len": 2.36, "type": "Heating"},
+        {"name": "Z#4", "len": 2.02, "type": "Heating"}, {"name": "Z#5", "len": 2.01, "type": "Heating"},
+        {"name": "Z#6", "len": 1.84, "type": "Heating"}, {"name": "Z#7", "len": 2.81, "type": "Heating"},
+        {"name": "WatCool#1", "len": 2.39, "type": "Cooling"}, {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
+        {"name": "Exit curtain", "len": 2.50, "type": "Cooling"}, {"name": "AirCool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "AirCool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ]
 }
 
@@ -115,10 +83,11 @@ MODEL_DB = pd.DataFrame([
     {"Model": "KN9 #6", "Pitch (mm)": 760},
     {"Model": "D12A", "Pitch (mm)": 790},
     {"Model": "Y4L", "Pitch (mm)": 790},
-    {"Model": "F44 / F48 50T", "Pitch (mm)": 660},
-    {"Model": "P42QR/W42JK 63T", "Pitch (mm)": 760},
-    {"Model": "CDS SU2 50T", "Pitch (mm)": 660},
-    {"Model": "CDS DNGA 52T", "Pitch (mm)": 610}
+    {"Model": "F44", "Pitch (mm)": 660},
+    {"Model": "F48", "Pitch (mm)": 660},
+    {"Model": "P42QR", "Pitch (mm)": 760},
+    {"Model": "SU2", "Pitch (mm)": 660},
+    {"Model": "DNGA", "Pitch (mm)": 610}
 ])
 
 ZONE_COLORS = {
@@ -132,6 +101,15 @@ IMAGE_MAPPING = {
     "NB3": "Screenshot 2026-10-20 144101.png"
 }
 
+def get_pitch_for_model(description):
+    """ค้นหา Pitch จากชื่อโมเดล ถ้าไม่เจอใช้ค่า 660mm เป็นค่าปริยาย"""
+    desc_str = str(description).upper()
+    for _, row in MODEL_DB.iterrows():
+        kw = str(row['Model']).upper()
+        if kw in desc_str:
+            return row['Pitch (mm)'] / 1000.0
+    return 0.660 # Default
+
 # ==============================================================================
 # 3. ส่วนของหน้าจอ Streamlit (UI)
 # ==============================================================================
@@ -140,7 +118,7 @@ st.set_page_config(page_title="Furnace Product Simulation", page_icon="🔥", la
 current_nb = "NB3" # Default fallback
 
 # ------------------------------------------------------------------------------
-# Sidebar: อัปโหลดไฟล์ .PAQ
+# Sidebar
 # ------------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### 1. อัปโหลดไฟล์ข้อมูล Datapaq (.PAQ)")
@@ -155,13 +133,13 @@ with st.sidebar:
         st.info("💡 สามารถอัปโหลดไฟล์ .PAQ เพื่อให้ระบบเลือกเตาให้อัตโนมัติ หรือเลือกเตาเองที่หน้าจอด้านขวาได้เลยครับ")
 
 # ------------------------------------------------------------------------------
-# Main Page: จำลองตำแหน่งชิ้นงาน (Simulation)
+# Main Page
 # ------------------------------------------------------------------------------
 st.title("🔥 Furnace Product & Simulation")
-st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) อ้างอิงจากระยะ Pitch ของโมเดลและความยาวโซนเตา")
+st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) โดยอ้างอิงจากแผนการโหลดชิ้นงานจริง")
 
 # ==============================================================================
-# --- ส่วนอัปโหลดไฟล์ Excel แบบป้องกันนามสกุลอื่น ---
+# อัปโหลดไฟล์ Excel
 # ==============================================================================
 st.markdown("### 📥 อัปโหลดแผนการผลิต (Excel)")
 uploaded_excels = st.file_uploader(
@@ -170,43 +148,83 @@ uploaded_excels = st.file_uploader(
     accept_multiple_files=True
 )
 
+df_pieces = pd.DataFrame()
+
 if uploaded_excels:
     st.success(f"✅ อัปโหลดไฟล์ Excel สำเร็จจำนวน {len(uploaded_excels)} ไฟล์")
     
-    with st.expander("ดูตัวอย่างข้อมูลที่อัปโหลด (Data Preview)"):
-        for file in uploaded_excels:
-            try:
-                df_preview = pd.read_excel(file)
-                st.write(f"📄 **ไฟล์:** `{file.name}`")
-                st.dataframe(df_preview, use_container_width=True) 
-            except Exception as e:
-                st.error(f"ไม่สามารถอ่านไฟล์ {file.name} ได้: {e}")
+    # 1. อ่านข้อมูล Excel ทั้งหมดมารวมกัน
+    dfs = []
+    for file in uploaded_excels:
+        try:
+            df_temp = pd.read_excel(file)
+            dfs.append(df_temp)
+        except Exception as e:
+            st.error(f"ไม่สามารถอ่านไฟล์ {file.name} ได้: {e}")
+            
+    if dfs:
+        df_schedule = pd.concat(dfs, ignore_index=True)
+        # กรองเฉพาะแถวที่มี Start Time และ End Time
+        if 'Start Time' in df_schedule.columns and 'End Time' in df_schedule.columns and 'Quantity' in df_schedule.columns:
+            df_schedule = df_schedule.dropna(subset=['Start Time', 'End Time', 'Quantity'])
+            
+            with st.expander("ดูข้อมูลแผนการผลิต (Data Preview)"):
+                st.dataframe(df_schedule, use_container_width=True)
+                
+            # 2. กระจายข้อมูลชิ้นงานแต่ละชิ้น (Calculate Load Time for every single piece)
+            pieces_list = []
+            for _, row in df_schedule.iterrows():
+                qty = int(row['Quantity'])
+                if qty <= 0: continue
+                
+                start_t = pd.to_datetime(row['Start Time'])
+                end_t = pd.to_datetime(row['End Time'])
+                desc = str(row.get('Description', 'Unknown Model'))
+                
+                pitch_m = get_pitch_for_model(desc)
+                
+                # หาความเร็วสายพานของ Model นึ้ = ระยะห่างชิ้นงาน / เวลาที่ใช้โหลดแต่ละชิ้น
+                total_seconds = (end_t - start_t).total_seconds()
+                if qty > 1 and total_seconds > 0:
+                    interval_s = total_seconds / qty
+                    speed_ms = pitch_m / interval_s
+                else:
+                    interval_s = 0
+                    speed_ms = 1.5 / 60.0 # ค่าปริยาย 1.5 เมตร/นาที
+                    
+                for i in range(qty):
+                    load_t = start_t + pd.Timedelta(seconds=i * interval_s)
+                    pieces_list.append({
+                        'Model': desc,
+                        'LoadTime': load_t,
+                        'Pitch_m': pitch_m,
+                        'Speed_ms': speed_ms
+                    })
+            
+            df_pieces = pd.DataFrame(pieces_list)
+            if not df_pieces.empty:
+                df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
+        else:
+            st.error("❌ ไฟล์ Excel ไม่มีคอลัมน์ 'Start Time', 'End Time' หรือ 'Quantity' ตามฟอร์แมตที่ต้องการ")
 
 st.markdown("---")
+
 # ==============================================================================
+# กราฟจำลอง Simulation
+# ==============================================================================
+col1, col2 = st.columns([1, 2])
 
-col1, col2 = st.columns(2)
-
-# กำหนด Default เป็นเตาที่ตรวจเจอจากการอัปโหลด (ถ้ามี)
+# เลือกเตา
 furnace_options = ["NB1", "NB2", "NB3"]
 default_index = furnace_options.index(current_nb) if current_nb in furnace_options else 2
 
 with col1:
     selected_nb = st.selectbox("1. เลือกเตา (Select Furnace):", furnace_options, index=default_index)
-with col2:
-    selected_model = st.selectbox("2. เลือกโมเดลที่รัน (Select Model):", MODEL_DB["Model"].tolist())
 
-# ดึงค่า Pitch
-pitch_mm = MODEL_DB.loc[MODEL_DB["Model"] == selected_model, "Pitch (mm)"].values[0]
-pitch_m = pitch_mm / 1000.0
-
-st.success(f"📍 **Model:** {selected_model} | **ระยะห่างต่อชิ้น (Pitch):** {pitch_mm} mm ({pitch_m:.3f} เมตร)")
-
-# คำนวณความยาวสะสมของแต่ละ Zone
+# คำนวณความยาวสะสมของแต่ละ Zone ของเตาที่เลือก
 zones = FURNACE_ZONE_DATA[selected_nb]
 cumulative_len = 0
 furnace_zones_df = []
-
 for z in zones:
     start = cumulative_len
     end = cumulative_len + z["len"]
@@ -219,41 +237,105 @@ for z in zones:
 total_furnace_length = cumulative_len
 df_zones = pd.DataFrame(furnace_zones_df)
 
-# สร้างตำแหน่งชิ้นงานทั้งหมดในเตา
-product_positions = np.arange(0, total_furnace_length, pitch_m)
-
-# วาดกราฟ 2D Map โครงสร้างเตา
+# สร้างแกนกราฟ
 fig = go.Figure()
 
-# วาดแถบของแต่ละ Zone
+# 1. วาดแถบของแต่ละ Zone
 for idx, row in df_zones.iterrows():
     fig.add_shape(
         type="rect", x0=row["Start"], x1=row["End"], y0=0, y1=1,
         fillcolor=ZONE_COLORS.get(row["Type"], "#ccc"), line=dict(color="white", width=1),
         layer="below"
     )
-    # ใส่ชื่อ Zone กึ่งกลางแถบสี (ไม่ถูกบังแล้ว)
     fig.add_annotation(
         x=(row["Start"] + row["End"]) / 2, y=0.5,
         text=row["Name"], showarrow=False, textangle=-90,
         font=dict(size=11, color="black" if row["Type"] in ["Dryer", "Xfer", "Cooling"] else "white")
     )
 
-# วาดเส้นแกนสายพาน (Conveyor Line) รองรับชิ้นงาน (อยู่ด้านบนที่ตำแหน่ง y=1.2)
+# 2. วาดเส้นแกนสายพาน
 fig.add_shape(
     type="line", x0=0, x1=total_furnace_length, y0=1.2, y1=1.2,
     line=dict(color="gray", width=2, dash="dot"), layer="below"
 )
 
-# วาดชิ้นงาน (Product Markers) ยกขึ้นไปไว้ด้านบนที่ระยะ y=1.2 ไม่ให้บังตัวหนังสือ
-fig.add_trace(go.Scatter(
-    x=product_positions, y=[1.2] * len(product_positions),
-    mode="markers", name=f"ชิ้นงาน {selected_model}",
-    marker=dict(symbol="square", size=12, color="#32CD32", line=dict(width=2, color="black")),
-    hovertemplate="ตำแหน่ง: %{x:.2f} เมตร<extra></extra>"
-))
+# ------------------------------------------------------------------------------
+# หากมีการอัปโหลด Excel และคำนวณชิ้นงานได้
+# ------------------------------------------------------------------------------
+if not df_pieces.empty:
+    with col2:
+        # Time Slider!
+        min_time = df_pieces['LoadTime'].min()
+        max_time = df_pieces['LoadTime'].max() + pd.Timedelta(minutes=90) # เผื่อเวลาให้ชิ้นงานออก
+        
+        sim_time = st.slider(
+            "⏱️ ลากเพื่อเลื่อนดูเวลาจำลอง (Slide to Simulator Time):", 
+            min_value=min_time.to_pydatetime(), 
+            max_value=max_time.to_pydatetime(), 
+            value=min_time.to_pydatetime(), 
+            step=timedelta(minutes=1),
+            format="YYYY-MM-DD HH:mm"
+        )
+    
+    # คำนวณระยะทางของชิ้นงานทุกชิ้น ณ วินาที sim_time
+    df_pieces['Elapsed_s'] = (pd.to_datetime(sim_time) - df_pieces['LoadTime']).dt.total_seconds()
+    df_pieces['Position'] = df_pieces['Elapsed_s'] * df_pieces['Speed_ms']
+    
+    # กรองเฉพาะชิ้นงานที่กำลังอยู่ในเตา (Position >= 0 และ <= ความยาวเตา)
+    df_current = df_pieces[(df_pieces['Position'] >= 0) & (df_pieces['Position'] <= total_furnace_length)]
+    
+    # วาดชิ้นงานลงในกราฟ โดยแยกสีตาม Model
+    color_sequence = px.colors.qualitative.Plotly
+    
+    if not df_current.empty:
+        for i, (model_name, group) in enumerate(df_current.groupby('Model')):
+            fig.add_trace(go.Scatter(
+                x=group['Position'], y=[1.2] * len(group),
+                mode="markers", name=model_name,
+                marker=dict(symbol="square", size=12, color=color_sequence[i % len(color_sequence)], line=dict(width=1, color="black")),
+                hovertemplate=f"<b>{model_name}</b><br>ตำแหน่ง: %{{x:.2f}} ม.<br>โหลดเข้า: %{{customdata}}<extra></extra>",
+                customdata=group['LoadTime'].dt.strftime('%H:%M:%S')
+            ))
+            
+    # ตารางสรุปจำนวนชิ้นงาน (WIP)
+    st.markdown(f"### 📋 สรุปจำนวนชิ้นงานในเตา ณ เวลา **{sim_time.strftime('%Y-%m-%d %H:%M')}**")
+    if not df_current.empty:
+        bins = [0] + df_zones["End"].tolist()
+        labels = df_zones["Name"].tolist()
+        df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=labels, right=True)
+        
+        # จัดกลุ่มนับจำนวนชิ้นงาน แยกตาม Zone และ Model
+        wip_summary = df_current.groupby(['Zone', 'Model']).size().reset_index(name='Quantity')
+        wip_summary = wip_summary[wip_summary['Quantity'] > 0]
+        
+        # แปลงตาราง Pivot ให้ดูง่ายขึ้น (Zone เป็นคอลัมน์, Model เป็นแถว)
+        wip_pivot = wip_summary.pivot(index='Model', columns='Zone', values='Quantity').fillna(0).astype(int)
+        st.dataframe(wip_pivot, use_container_width=True)
+    else:
+        st.info("ไม่มีชิ้นงานอยู่ในเตา ณ เวลาที่เลือก")
 
-# นำภาพเตาขึ้นไปวางด้านบนโครงสร้าง (ถ้ามีไฟล์)
+# ------------------------------------------------------------------------------
+# หากยังไม่ได้อัปโหลด Excel ให้โชว์แบบ Static เป็นตัวอย่างแทน
+# ------------------------------------------------------------------------------
+else:
+    with col2:
+        st.info("💡 **ข้อมูลการโหลดชิ้นงานยังว่างเปล่า** (ด้านล่างคือภาพตัวอย่าง) อัปโหลดไฟล์ Excel เพื่อดูตำแหน่งจริงและเวลาที่สัมพันธ์กัน")
+        selected_model = st.selectbox("เลือกโมเดลเพื่อดูตัวอย่าง (Sample Model):", MODEL_DB["Model"].tolist())
+    
+    pitch_mm = MODEL_DB.loc[MODEL_DB["Model"] == selected_model, "Pitch (mm)"].values[0]
+    pitch_m = pitch_mm / 1000.0
+    
+    product_positions = np.arange(0, total_furnace_length, pitch_m)
+    fig.add_trace(go.Scatter(
+        x=product_positions, y=[1.2] * len(product_positions),
+        mode="markers", name=f"ตัวอย่าง {selected_model}",
+        marker=dict(symbol="square", size=12, color="#32CD32", line=dict(width=2, color="black")),
+        hovertemplate="ตำแหน่ง: %{x:.2f} เมตร<extra></extra>"
+    ))
+
+# ------------------------------------------------------------------------------
+# นำภาพ Layout เตาขึ้นไปวางด้านบนโครงสร้าง (ถ้ามีไฟล์)
+# ------------------------------------------------------------------------------
 img_file_sim = IMAGE_MAPPING.get(selected_nb)
 y_range = [-0.2, 1.8] # ระยะขอบ Y เริ่มต้นถ้าไม่มีรูป
 
@@ -262,11 +344,11 @@ if os.path.exists(img_file_sim):
     fig.add_layout_image(
         dict(
             source=img, xref="x", yref="y",
-            x=0, y=3.2, sizex=total_furnace_length, sizey=1.6, # วางรูปลอยขึ้นไปให้ไม่บังชิ้นงาน
+            x=0, y=3.2, sizex=total_furnace_length, sizey=1.6, # วางรูปลอยขึ้นไป
             sizing="stretch", opacity=1, layer="above"
         )
     )
-    y_range = [-0.2, 3.5] # ขยายแกน Y เพื่อให้มีพื้นที่แสดงรูปด้านบนและไม่เบียดกัน
+    y_range = [-0.2, 3.5]
 
 # ตั้งค่ากราฟให้สวยงาม
 fig.update_layout(
@@ -279,21 +361,3 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig, use_container_width=True)
-
-# ==============================================================================
-# ตารางสรุปจำนวนชิ้นงาน (WIP) ในแต่ละ Zone
-# ==============================================================================
-st.markdown("### 📋 สรุปจำนวนชิ้นงานที่กำลังอยู่ในแต่ละกระบวนการ (WIP)")
-
-# คำนวณว่าแต่ละชิ้นงานอยู่ในช่วงของ Zone ใด
-bins = [0] + df_zones["End"].tolist()
-labels = df_zones["Name"].tolist()
-zone_counts = pd.cut(product_positions, bins=bins, labels=labels, right=True).value_counts()
-
-df_wip = pd.DataFrame({"Zone / Process": zone_counts.index, "จำนวนชิ้นงาน (ชิ้น)": zone_counts.values})
-
-# กรองเอาเฉพาะโซนที่มีชิ้นงานอยู่ (จำนวน > 0)
-df_wip = df_wip[df_wip["จำนวนชิ้นงาน (ชิ้น)"] > 0]
-
-# แปลงตารางให้เป็นแนวนอนเพื่อให้ดูง่ายขึ้นบนหน้าจอ
-st.dataframe(df_wip.set_index("Zone / Process").T, use_container_width=True)
