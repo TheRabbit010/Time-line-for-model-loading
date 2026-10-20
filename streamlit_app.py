@@ -58,7 +58,7 @@ if uploaded_file is not None:
     elif current_nb == "NB3":
         st.warning("✅ โหลดไทม์ไลน์และตั้งค่าสำหรับเตา NB3")
         # แสดงภาพของ NB3 (ภาพขวา)
-        st.image("image_c5aa7e.png", caption="Brazing Line - NB3", use_container_width=True)
+        st.image("Screenshot 2026-10-20 144101.png", caption="Brazing Line - NB3", use_container_width=True)
 
 else:
     st.info("กรุณาอัปโหลดไฟล์ .PAQ เพื่อเริ่มต้นการทำงาน")
