@@ -123,6 +123,33 @@ with st.sidebar:
 st.title("🔥 Furnace Product & Simulation")
 st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) อ้างอิงจากระยะ Pitch ของโมเดลและความยาวโซนเตา")
 
+# ==============================================================================
+# --- เพิ่มส่วนอัปโหลดไฟล์ Excel แบบป้องกันนามสกุลอื่น ---
+# ==============================================================================
+st.markdown("### 📥 อัปโหลดแผนการผลิต (Excel)")
+uploaded_excels = st.file_uploader(
+    "อัปโหลดไฟล์ข้อมูลแผนการผลิต (.xlsx หรือ .xls สามารถเลือกหลายไฟล์พร้อมกันได้)", 
+    type=["xlsx", "xls"], # กำหนด type ให้รับแค่ไฟล์ Excel ระบบจะป้องกันไฟล์อื่นให้อัตโนมัติ
+    accept_multiple_files=True
+)
+
+if uploaded_excels:
+    st.success(f"✅ อัปโหลดไฟล์ Excel สำเร็จจำนวน {len(uploaded_excels)} ไฟล์")
+    
+    # ซ่อนส่วนพรีวิวข้อมูลไว้ใน expander เพื่อไม่ให้รกหน้าจอหลัก
+    with st.expander("ดูตัวอย่างข้อมูลที่อัปโหลด (Data Preview)"):
+        for file in uploaded_excels:
+            try:
+                # อ่านไฟล์ Excel
+                df_preview = pd.read_excel(file)
+                st.write(f"📄 **ไฟล์:** `{file.name}`")
+                st.dataframe(df_preview.head(5), use_container_width=True) # แสดงตัวอย่าง 5 แถวแรก
+            except Exception as e:
+                st.error(f"ไม่สามารถอ่านไฟล์ {file.name} ได้: {e}")
+
+st.markdown("---")
+# ==============================================================================
+
 col1, col2 = st.columns(2)
 
 # กำหนด Default เป็นเตาที่ตรวจเจอจากการอัปโหลด (ถ้ามี)
