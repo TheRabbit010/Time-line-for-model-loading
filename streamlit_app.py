@@ -48,7 +48,7 @@ if uploaded_file is not None:
     if current_nb == "NB1":
         st.success("✅ โหลดไทม์ไลน์และตั้งค่าสำหรับเตา NB1")
         # แสดงภาพของ NB1 (ภาพซ้าย)
-        st.image("image_c55827.png", caption="Brazing Line - NB1", use_container_width=True)
+        st.image("Screenshot 2026-10-20 143941.png", caption="Brazing Line - NB1", use_container_width=True)
         
     elif current_nb == "NB2":
         st.info("✅ โหลดไทม์ไลน์และตั้งค่าสำหรับเตา NB2")
