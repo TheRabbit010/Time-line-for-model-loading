@@ -90,9 +90,9 @@ ZONE_COLORS = {
 }
 
 IMAGE_MAPPING = {
-    "NB1": "image_c55827.png",
-    "NB2": "image_c5aa27.png",
-    "NB3": "image_c5aa7e.png"
+    "NB1": "Screenshot 2026-10-20 143941.png",
+    "NB2": "Screenshot 2026-10-20 144037.png",
+    "NB3": "Screenshot 2026-10-20 144101.png"
 }
 
 # ==============================================================================
