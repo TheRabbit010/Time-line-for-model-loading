@@ -170,16 +170,22 @@ for idx, row in df_zones.iterrows():
         fillcolor=ZONE_COLORS.get(row["Type"], "#ccc"), line=dict(color="white", width=1),
         layer="below"
     )
-    # ใส่ชื่อ Zone กึ่งกลาง
+    # ใส่ชื่อ Zone กึ่งกลางแถบสี (ไม่ถูกบังแล้ว)
     fig.add_annotation(
         x=(row["Start"] + row["End"]) / 2, y=0.5,
         text=row["Name"], showarrow=False, textangle=-90,
         font=dict(size=11, color="black" if row["Type"] in ["Dryer", "Xfer", "Cooling"] else "white")
     )
 
-# วาดชิ้นงาน (Product Markers) ทับลงไป
+# วาดเส้นแกนสายพาน (Conveyor Line) รองรับชิ้นงาน
+fig.add_shape(
+    type="line", x0=0, x1=total_furnace_length, y0=1.2, y1=1.2,
+    line=dict(color="gray", width=2, dash="dot"), layer="below"
+)
+
+# วาดชิ้นงาน (Product Markers) ยกขึ้นไปไว้ด้านบนที่ระยะ y=1.2
 fig.add_trace(go.Scatter(
-    x=product_positions, y=[0.5] * len(product_positions), # ให้อยู่กึ่งกลางความสูง
+    x=product_positions, y=[1.2] * len(product_positions),
     mode="markers", name=f"ชิ้นงาน {selected_model}",
     marker=dict(symbol="square", size=12, color="#32CD32", line=dict(width=2, color="black")),
     hovertemplate="ตำแหน่ง: %{x:.2f} เมตร<extra></extra>"
@@ -187,25 +193,25 @@ fig.add_trace(go.Scatter(
 
 # นำภาพเตาขึ้นไปวางด้านบนโครงสร้าง (ถ้ามีไฟล์)
 img_file_sim = IMAGE_MAPPING.get(selected_nb)
-y_range = [-0.2, 1.2]
+y_range = [-0.2, 1.8] # ระยะขอบ Y เริ่มต้นถ้าไม่มีรูป
 
 if os.path.exists(img_file_sim):
     img = Image.open(img_file_sim)
     fig.add_layout_image(
         dict(
             source=img, xref="x", yref="y",
-            x=0, y=2.5, sizex=total_furnace_length, sizey=1.5,
+            x=0, y=3.2, sizex=total_furnace_length, sizey=1.6, # วางรูปลอยขึ้นไปให้ไม่บังชิ้นงาน
             sizing="stretch", opacity=1, layer="above"
         )
     )
-    y_range = [-0.2, 2.6] # ขยายแกน Y เพื่อให้มีพื้นที่แสดงรูปด้านบน
+    y_range = [-0.2, 3.5] # ขยายแกน Y เพื่อให้มีพื้นที่แสดงรูปด้านบนและไม่เบียดกัน
 
 # ตั้งค่ากราฟให้สวยงาม
 fig.update_layout(
     title=f"Furnace Timeline: {selected_nb} (Total Length: {total_furnace_length:.2f} m)",
     xaxis=dict(title="Distance (Meters)", range=[0, total_furnace_length], tickmode="linear", tick0=0, dtick=2),
     yaxis=dict(visible=False, range=y_range),
-    height=400, margin=dict(l=20, r=20, t=50, b=40),
+    height=450, margin=dict(l=20, r=20, t=50, b=40),
     template="plotly_white", hovermode="x unified",
     showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
 )
