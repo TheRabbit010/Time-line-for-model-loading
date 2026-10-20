@@ -143,7 +143,8 @@ if uploaded_excels:
                 # อ่านไฟล์ Excel
                 df_preview = pd.read_excel(file)
                 st.write(f"📄 **ไฟล์:** `{file.name}`")
-                st.dataframe(df_preview.head(5), use_container_width=True) # แสดงตัวอย่าง 5 แถวแรก
+                # แสดงผลข้อมูลทั้งหมดใน Dataframe โดยไม่ได้ใช้ .head(5) แล้ว
+                st.dataframe(df_preview, use_container_width=True) 
             except Exception as e:
                 st.error(f"ไม่สามารถอ่านไฟล์ {file.name} ได้: {e}")
 
