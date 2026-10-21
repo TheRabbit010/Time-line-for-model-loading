@@ -10,11 +10,10 @@ from datetime import timedelta, datetime
 import math
 
 # ==============================================================================
-# 1. ฟังก์ชันสำหรับแยกประเภทเตา (NB1, NB2, NB3) จากชื่อไฟล์
+# 1. ฟังก์ชันสำหรับแยกประเภทเตาจากไฟล์ .PAQ
 # ==============================================================================
 def identify_furnace_type(text_to_search):
     furnace_id = "NB3" # Default
-    
     if re.search(r'\b(RAD|CDS|KN9|12SHP|DNGA|P42QR|P42V|SU2|F44|Y4L)\b', text_to_search, re.IGNORECASE): 
         furnace_id = "NB1"
     elif re.search(r'\b(Utahc|UT|Tahc|G2|NB2)\b', text_to_search, re.IGNORECASE): 
@@ -28,11 +27,39 @@ def identify_furnace_type(text_to_search):
         if f_match: 
             found_num = next(g for g in f_match.groups() if g is not None)
             furnace_id = f"NB{found_num}"
-
     return furnace_id
 
 # ==============================================================================
-# 2. ฐานข้อมูลโซนของเตา (แยก Entrance กับ Xfer ออกจากกัน)
+# 2. ฟังก์ชันวิเคราะห์หาเตาจากข้อมูลใน Excel (Reference & Description)
+# ==============================================================================
+def detect_furnace_from_dataframe(df):
+    text_data = ""
+    # นำข้อมูลคอลัมน์ Description และ Reference มารวมกันเพื่อหา Keyword
+    if 'Description' in df.columns:
+        text_data += " ".join(df['Description'].dropna().astype(str).tolist())
+    if 'Reference' in df.columns:
+        text_data += " " + " ".join(df['Reference'].dropna().astype(str).tolist())
+        
+    text_data = text_data.upper()
+    
+    # คำค้นหาที่เป็นเอกลักษณ์ของแต่ละเตา
+    nb1_kws = ["16XHP", "27XHP", "12XHP", "CMFB", "D15B", "DNGA", "P42QR", "W42JK", "F44", "F48", "DEMIO", "5H45V", "KN9", "N117", "YR9", "SU2", "Y4L", "GC7"]
+    nb2_kws = ["TAHC", "UTAHC", "CHORA"]
+    nb3_kws = ["KE8", "X11C", "T34", "RBC", "K2", "J4LL", "BTM", "EVO", "CORION"]
+    
+    nb1_score = sum(text_data.count(kw) for kw in nb1_kws)
+    nb2_score = sum(text_data.count(kw) for kw in nb2_kws)
+    nb3_score = sum(text_data.count(kw) for kw in nb3_kws)
+    
+    if nb1_score == 0 and nb2_score == 0 and nb3_score == 0:
+        return None
+        
+    scores = {"NB1": nb1_score, "NB2": nb2_score, "NB3": nb3_score}
+    # คืนค่าเตาที่มีจำนวน Keyword ตรงกันมากที่สุด
+    return max(scores, key=scores.get)
+
+# ==============================================================================
+# 3. ฐานข้อมูลโซนของเตา (Zone Lengths) อัปเดตล่าสุด
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
@@ -88,7 +115,7 @@ IMAGE_MAPPING = {
 }
 
 # ==============================================================================
-# 3. ฐานข้อมูล Model Pitch และ Pieces per Pitch
+# 4. ฐานข้อมูล Model Pitch และ Pieces per Pitch
 # ==============================================================================
 def get_model_info(description, furnace_id):
     desc = str(description).upper()
@@ -135,11 +162,11 @@ def get_model_info(description, furnace_id):
     return 0.660, 2
 
 # ==============================================================================
-# 4. ส่วนของหน้าจอ Streamlit (UI)
+# 5. ส่วนของหน้าจอ Streamlit (UI)
 # ==============================================================================
 st.set_page_config(page_title="Furnace Product Simulation", page_icon="🔥", layout="wide")
 
-current_nb_detected = None
+current_nb_detected_paq = None
 
 with st.sidebar:
     st.markdown("### 1. อัปโหลดไฟล์ข้อมูล Datapaq (.PAQ)")
@@ -148,7 +175,7 @@ with st.sidebar:
 
     if uploaded_file is not None:
         filename = uploaded_file.name
-        current_nb_detected = identify_furnace_type(filename)
+        current_nb_detected_paq = identify_furnace_type(filename)
         st.success(f"✅ อัปโหลดไฟล์ .PAQ สำเร็จ")
 
 # ------------------------------------------------------------------------------
@@ -158,7 +185,7 @@ st.title("🔥 Furnace Product & Simulation")
 st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) โดยอ้างอิงจากแผนการโหลดชิ้นงานจริง")
 
 # ==============================================================================
-# 5. อัปโหลดและประมวลผลข้อมูล Excel
+# 6. อัปโหลดและเตรียมข้อมูล Excel
 # ==============================================================================
 st.markdown("### 📥 2. อัปโหลดแผนการผลิต (Excel)")
 uploaded_excels = st.file_uploader(
@@ -167,21 +194,40 @@ uploaded_excels = st.file_uploader(
     accept_multiple_files=True
 )
 
+df_schedule_raw = pd.DataFrame()
+current_nb_detected_excel = None
+
 if uploaded_excels:
     st.success(f"✅ อัปโหลดไฟล์ Excel สำเร็จจำนวน {len(uploaded_excels)} ไฟล์")
+    dfs = []
+    for file in uploaded_excels:
+        try:
+            df_temp = pd.read_excel(file)
+            dfs.append(df_temp)
+        except Exception as e:
+            st.error(f"ไม่สามารถอ่านไฟล์ {file.name} ได้: {e}")
+            
+    if dfs:
+        df_schedule_raw = pd.concat(dfs, ignore_index=True)
+        # ให้ระบบตรวจสอบเตาจากคอลัมน์ A&B โดยอัตโนมัติ
+        current_nb_detected_excel = detect_furnace_from_dataframe(df_schedule_raw)
 
 st.markdown("---")
 
 # ==============================================================================
-# 6. ตั้งค่าพารามิเตอร์เตา 
+# 7. ตั้งค่าพารามิเตอร์เตา 
 # ==============================================================================
 st.markdown("### ⚙️ 3. ตั้งค่าพารามิเตอร์เตา")
 col1, col2 = st.columns(2)
 
 with col1:
-    if current_nb_detected:
-        st.info(f"🔥 ระบบตรวจพบเตาจากไฟล์ .PAQ: **{current_nb_detected}**")
-        current_nb = current_nb_detected
+    # ลำดับความสำคัญในการระบุเตา: PAQ > Excel > Manual
+    auto_detected_nb = current_nb_detected_paq or current_nb_detected_excel
+    
+    if auto_detected_nb:
+        source_msg = ".PAQ" if current_nb_detected_paq else "Excel"
+        st.info(f"🔥 ระบบตรวจพบเตาจากไฟล์ {source_msg}: **{auto_detected_nb}**")
+        current_nb = auto_detected_nb
     else:
         current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
 
@@ -207,7 +253,7 @@ with col2:
 st.markdown("---")
 
 # ==============================================================================
-# 7. ประมวลผลข้อมูลชิ้นงาน
+# 8. ประมวลผลข้อมูลชิ้นงาน
 # ==============================================================================
 zones = FURNACE_ZONE_DATA[current_nb]
 cumulative_len = 0
@@ -227,79 +273,68 @@ all_zone_labels = df_zones["Name"].tolist()
 
 df_pieces = pd.DataFrame()
 
-if uploaded_excels:
-    dfs = []
-    for file in uploaded_excels:
-        try:
-            df_temp = pd.read_excel(file)
-            dfs.append(df_temp)
-        except Exception as e:
-            st.error(f"ไม่สามารถอ่านไฟล์ {file.name} ได้: {e}")
-            
-    if dfs:
-        df_schedule = pd.concat(dfs, ignore_index=True)
+if not df_schedule_raw.empty:
+    required_cols = ['Description', 'Quantity', 'Start Time']
+    if all(col in df_schedule_raw.columns for col in required_cols):
+        df_schedule = df_schedule_raw.dropna(subset=['Start Time', 'Quantity']).copy()
+        df_schedule = df_schedule[df_schedule['Quantity'] > 0]
         
-        required_cols = ['Description', 'Quantity', 'Start Time']
-        if all(col in df_schedule.columns for col in required_cols):
-            df_schedule = df_schedule.dropna(subset=['Start Time', 'Quantity'])
-            df_schedule = df_schedule[df_schedule['Quantity'] > 0]
+        df_schedule['Start Time'] = pd.to_datetime(df_schedule['Start Time'])
+        df_schedule = df_schedule.sort_values('Start Time')
+        
+        preview_cols = required_cols.copy()
+        if 'Reference' in df_schedule.columns:
+            preview_cols.insert(0, 'Reference')
+        
+        with st.expander("ดูข้อมูลแผนการผลิต (Data Preview)"):
+            st.dataframe(df_schedule[preview_cols].head(50), use_container_width=True)
             
-            df_schedule['Start Time'] = pd.to_datetime(df_schedule['Start Time'])
-            df_schedule = df_schedule.sort_values('Start Time')
+        pieces_list = []
+        next_available_time = None  
+        
+        for _, row in df_schedule.iterrows():
+            qty = int(row['Quantity'])
+            start_t = row['Start Time']
+            desc = str(row['Description'])
             
-            preview_cols = required_cols.copy()
-            if 'Reference' in df_schedule.columns:
-                preview_cols.insert(0, 'Reference')
+            ref = str(row['Reference']) if 'Reference' in df_schedule.columns else ""
             
-            with st.expander("ดูข้อมูลแผนการผลิต (Data Preview)"):
-                st.dataframe(df_schedule[preview_cols].head(50), use_container_width=True)
-                
-            pieces_list = []
-            next_available_time = None  
+            pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
+            interval_s = pitch_m / belt_speed_ms
             
-            for _, row in df_schedule.iterrows():
-                qty = int(row['Quantity'])
-                start_t = row['Start Time']
-                desc = str(row['Description'])
-                
-                ref = str(row['Reference']) if 'Reference' in df_schedule.columns else ""
-                
-                pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
-                interval_s = pitch_m / belt_speed_ms
-                
-                rows_to_load = int(math.ceil(qty / pieces_per_pitch))
-                
-                if next_available_time is None or start_t > next_available_time:
-                    current_load_time = start_t
-                else:
-                    current_load_time = next_available_time
-                
-                for i in range(rows_to_load):
-                    pieces_list.append({
-                        'Reference': ref,
-                        'Model': desc,
-                        'LoadTime': current_load_time,
-                        'Pitch_m': pitch_m,
-                        'Speed_ms': belt_speed_ms,
-                        'Pieces_in_Box': pieces_per_pitch
-                    })
-                    current_load_time += pd.Timedelta(seconds=interval_s)
-                
-                next_available_time = current_load_time
+            rows_to_load = int(math.ceil(qty / pieces_per_pitch))
             
-            df_pieces = pd.DataFrame(pieces_list)
-            if not df_pieces.empty:
-                df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
-                df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(total_furnace_length / df_pieces['Speed_ms'], unit='s')
-                df_pieces['Display_Model'] = df_pieces.apply(
-                    lambda x: f"{x['Model']} ({x['Reference']})" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
-                    axis=1
-                )
-        else:
-            st.error(f"❌ ไฟล์ Excel ต้องมีคอลัมน์ต่อไปนี้: {', '.join(required_cols)}")
+            if next_available_time is None or start_t > next_available_time:
+                current_load_time = start_t
+            else:
+                current_load_time = next_available_time
+            
+            for i in range(rows_to_load):
+                pieces_list.append({
+                    'Reference': ref,
+                    'Model': desc,
+                    'LoadTime': current_load_time,
+                    'Pitch_m': pitch_m,
+                    'Speed_ms': belt_speed_ms,
+                    'Pieces_in_Box': pieces_per_pitch
+                })
+                current_load_time += pd.Timedelta(seconds=interval_s)
+            
+            next_available_time = current_load_time
+        
+        df_pieces = pd.DataFrame(pieces_list)
+        if not df_pieces.empty:
+            df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
+            df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(total_furnace_length / df_pieces['Speed_ms'], unit='s')
+            df_pieces['Display_Model'] = df_pieces.apply(
+                lambda x: f"{x['Model']} ({x['Reference']})" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
+                axis=1
+            )
+    else:
+        st.error(f"❌ ไฟล์ Excel ต้องมีคอลัมน์ต่อไปนี้: {', '.join(required_cols)}")
 
 # ==============================================================================
-# 8. กราฟจำลอง Simulation
+# 9. กราฟจำลอง Simulation
 # ==============================================================================
 fig = go.Figure()
 
@@ -388,14 +423,14 @@ fig.update_layout(
     title=f"Furnace Timeline: {current_nb} (Total Length: {total_furnace_length:.2f} m)",
     xaxis=dict(title="Distance (Meters)", range=[0, total_furnace_length], tickmode="linear", tick0=0, dtick=2),
     yaxis=dict(visible=False, range=y_range),
-    height=550, # เพิ่มความสูงกราฟเผื่อกรณี Legend มีหลายบรรทัด
-    margin=dict(l=20, r=20, t=50, b=120), # เพิ่ม margin ด้านล่างเพื่อไม่ให้ Legend ทับแกน x
+    height=550, 
+    margin=dict(l=20, r=20, t=50, b=120), 
     template="plotly_white", hovermode="x unified",
     showlegend=True, 
     legend=dict(
         orientation="h", 
         yanchor="top", 
-        y=-0.25, # ย้าย Legend ไปอยู่ด้านล่างสุดของกราฟเพื่อป้องกันการซ้อนทับ 
+        y=-0.25, 
         xanchor="center", 
         x=0.5
     )
@@ -404,7 +439,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# 9. Time Slider & Manual Inputs
+# 10. Time Slider & Manual Inputs
 # ------------------------------------------------------------------------------
 if not df_pieces.empty:
     st.markdown("---")
@@ -466,7 +501,7 @@ if not df_pieces.empty:
     )
     
     # ==============================================================================
-    # 10. ตารางรายละเอียดรายโซน
+    # 11. ตารางรายละเอียดรายโซน
     # ==============================================================================
     st.markdown(f"### 📋 รายละเอียดชิ้นงานรายโซน ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
     
@@ -495,13 +530,12 @@ if not df_pieces.empty:
         wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model', 'Box_Count', 'Multiplier', 'Quantity'])
 
     # ==============================================================================
-    # 11. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ
+    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ
     # ==============================================================================
     st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
     
     zone_type_mapping = {z['name']: z['type'] for z in FURNACE_ZONE_DATA[current_nb]}
     
-    # อัปเดตชื่อกลุ่มใหม่เพื่อให้สะท้อนภาพที่ชัดเจนขึ้น
     display_type_names = {
         "Entrance": "🚪 Entrance (หน้าเตา)",
         "Heating": "🔥 Brazing Zone (Z#1 - Z#7)",
