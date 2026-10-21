@@ -190,11 +190,9 @@ default_speeds = {
     "NB2": 1.56,
     "NB3": 1.27
 }
-# ดึงค่า default ของเตาที่เลือกปัจจุบันมาใช้งาน
 default_speed_for_current_nb = default_speeds.get(current_nb, 1.40)
 
 with col2:
-    # ค่า value จะปรับเปลี่ยนตามเตา แต่ผู้ใช้ยังพิมพ์ทับ/เปลี่ยนตัวเลขในช่องได้
     belt_speed_m_min = st.number_input(
         "ความเร็วสายพาน (เมตร/นาที)", 
         min_value=0.1, 
@@ -233,7 +231,6 @@ if uploaded_excels:
             df_schedule['Start Time'] = pd.to_datetime(df_schedule['Start Time'])
             df_schedule = df_schedule.sort_values('Start Time')
             
-            # พรีวิวข้อมูล
             preview_cols = required_cols.copy()
             if 'Reference' in df_schedule.columns:
                 preview_cols.insert(0, 'Reference')
@@ -249,7 +246,6 @@ if uploaded_excels:
                 start_t = row['Start Time']
                 desc = str(row['Description'])
                 
-                # ดึงค่า Reference ถ้ามี
                 ref = str(row['Reference']) if 'Reference' in df_schedule.columns else ""
                 
                 pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
@@ -390,7 +386,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# 9. Time Slider & Manual Inputs (Two-way binding)
+# 9. Time Slider & Manual Inputs
 # ------------------------------------------------------------------------------
 if not df_pieces.empty:
     st.markdown("---")
@@ -451,15 +447,15 @@ if not df_pieces.empty:
         on_change=on_slider_change
     )
     
-    st.markdown(f"### 📋 สรุปจำนวนชิ้นงานในเตา ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
+    # ==============================================================================
+    # 10. ตารางรายละเอียดรายโซน (ตารางหลัก)
+    # ==============================================================================
+    st.markdown(f"### 📋 รายละเอียดชิ้นงานรายโซน ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
     if not df_current.empty:
         bins = [0] + df_zones["End"].tolist()
         labels = df_zones["Name"].tolist()
         df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=labels, right=True)
         
-        # ----------------------------------------------------------------------
-        # แปลง Model Name ให้รวม Reference ไว้ในบรรทัดใหม่เฉพาะในตาราง
-        # ----------------------------------------------------------------------
         df_current['Display_Model'] = df_current.apply(
             lambda x: f"{x['Model']}\n{x['Reference']}" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
             axis=1
@@ -474,10 +470,57 @@ if not df_pieces.empty:
         wip_summary['Quantity'] = wip_summary['Box_Count'] * wip_summary['Multiplier']
         
         wip_pivot = wip_summary.pivot(index='Display_Model', columns='Zone', values='Quantity').fillna(0).astype(int)
-        
-        # เปลี่ยนหัวคอลัมน์ Index เพื่อความสวยงาม
         wip_pivot.index.name = 'Model'
         
         st.dataframe(wip_pivot, use_container_width=True)
+        
+        # ==============================================================================
+        # 11. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)
+        # ==============================================================================
+        st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
+        
+        # สร้าง Mapping จากชื่อโซนย่อย (Name) ไปหา กลุ่มหลัก (Type)
+        zone_type_mapping = {z['name']: z['type'] for z in FURNACE_ZONE_DATA[current_nb]}
+        
+        # เปลี่ยนชื่อกลุ่มให้สวยงามสำหรับการแสดงผล
+        display_type_names = {
+            "Heating": "🔥 Brazing Zone (Z#1 - Z#7)",
+            "Dryer": "💨 Dryer Zone",
+            "Debinder": "♨️ Debinder Zone",
+            "Cooling": "❄️ Cooling Zone",
+            "Flux": "💧 Flux Zone",
+            "Xfer": "↔️ Transfer / Entrance",
+            "Exit": "🚪 Exit"
+        }
+        
+        # จับคู่ข้อมูลกลับไปยัง wip_summary
+        wip_summary['Process_Group_Raw'] = wip_summary['Zone'].map(zone_type_mapping)
+        wip_summary['Process_Group'] = wip_summary['Process_Group_Raw'].map(display_type_names)
+        
+        # สรุปผลรวมแยกตามกลุ่มกระบวนการและชื่อรุ่น
+        group_summary = wip_summary.groupby(['Process_Group', 'Display_Model'], observed=False)['Quantity'].sum().reset_index()
+        group_summary = group_summary[group_summary['Quantity'] > 0]
+        
+        process_groups = group_summary['Process_Group'].unique()
+        
+        if len(process_groups) > 0:
+            # นำมาแสดงในรูปแบบกล่องการ์ด แบ่ง 3 คอลัมน์ต่อ 1 แถว
+            cols = st.columns(3)
+            for idx, p_group in enumerate(process_groups):
+                col = cols[idx % 3]
+                with col:
+                    df_pg = group_summary[group_summary['Process_Group'] == p_group]
+                    total = int(df_pg['Quantity'].sum())
+                    
+                    with st.container(border=True):
+                        st.markdown(f"**{p_group}**")
+                        st.markdown(f"### รวม: {total} ชิ้น")
+                        # วนลูปแสดงรายชื่อรุ่นย่อยภายในกล่อง
+                        for _, r in df_pg.iterrows():
+                            model_name_inline = r['Display_Model'].replace('\n', ' ')
+                            st.caption(f"• {model_name_inline} : {int(r['Quantity'])} ชิ้น")
+        else:
+            st.info("ไม่มีชิ้นงานในกระบวนการหลัก")
+
     else:
         st.info("ไม่มีชิ้นงานอยู่ในเตา ณ เวลาที่เลือก")
