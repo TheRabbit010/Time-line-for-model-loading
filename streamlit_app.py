@@ -51,9 +51,8 @@ FURNACE_ZONE_DATA = {
         {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB2": [
-        {"name": "Entrance", "len": 2.02, "type": "Xfer"}, {"name": "Fluxer", "len": 4.70, "type": "Flux"},
-        {"name": "Xfer", "len": 2.00, "type": "Xfer"}, {"name": "Flux spray", "len": 4.70, "type": "Flux"},
-        {"name": "Xfer", "len": 2.50, "type": "Xfer"}, {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
+        {"name": "Xfer 1", "len": 2.00, "type": "Xfer"}, {"name": "Flux spray", "len": 4.70, "type": "Flux"},
+        {"name": "Xfer 2", "len": 2.50, "type": "Xfer"}, {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
         {"name": "DryOFF-Z#2", "len": 2.83, "type": "Dryer"}, {"name": "Xfer1", "len": 3.00, "type": "Xfer"},
         {"name": "Z#1", "len": 3.65, "type": "Heating"}, {"name": "Z#2", "len": 2.68, "type": "Heating"},
         {"name": "Z#3", "len": 2.36, "type": "Heating"}, {"name": "Z#4", "len": 2.02, "type": "Heating"},
@@ -89,60 +88,51 @@ IMAGE_MAPPING = {
 }
 
 # ==============================================================================
-# 3. ฐานข้อมูล Model Pitch และ Pieces per Pitch (แมปปิ้งครอบคลุมทุกรุ่น)
+# 3. ฐานข้อมูล Model Pitch และ Pieces per Pitch
 # ==============================================================================
 def get_model_info(description, furnace_id):
-    """
-    รับชื่อ Description และ Furnace ID 
-    เพื่อคืนค่า (Pitch เป็นเมตร, จำนวนชิ้นต่อกล่อง/แถว)
-    """
     desc = str(description).upper()
     
-    # --- Universal Matchers (พบใน Excel บ่อย) ---
-    if "16XHP" in desc: return 1.041, 2
-    if "27XHP" in desc: return 0.887, 2
-    if "12XHP" in desc and "SU2" in desc: return 0.580, 2
-    
-    if "CMFB" in desc: return 0.640, 2
-    if "D15B" in desc or "DNGA" in desc: return 0.610, 2
-    if "Y4L" in desc: return 0.790, 2
-    if "SU2" in desc: return 0.660, 2
-    
-    if "P42QRMY25" in desc: return 0.765, 2
-    if "P42QR" in desc or "W42JK" in desc: return 0.760, 2
-    if "F44" in desc or "F48" in desc: return 0.660, 2
-    if "DEMIO" in desc and "DE" in desc: return 0.565, 2
-    if "DEMIO" in desc and "CE" in desc: return 0.590, 2
-    if "5H45V" in desc: return 0.670, 2
-    if "KN9 #6" in desc: return 0.760, 1
-    if "KN9" in desc: return 0.790, 2
-    if "D12A" in desc: return 0.790, 2
-    if "T36" in desc: return 0.790, 2
-    if "N117" in desc: return 0.790, 2
-    if "YR9" in desc: return 0.790, 2
-    if "P13C" in desc and "RAD" in desc: return 0.518, 2
-    
-    # --- NB3 Models (BTM, EVO, CORION) ---
-    if "KE8" in desc: return 0.370, 3
-    if any(kw in desc for kw in ["X11C", "T34", "RBC", "K2"]): return 0.383, 3
-    if "J4LL" in desc: return 0.383, 2 
-    if "BTM N175" in desc: return 1.280, 2
-    if "BTM N173" in desc: return 1.400, 2
-    if "BTM M48" in desc: return 1.435, 1
-    if "EVO" in desc or "CORION" in desc: return 0.463, 3
-    
-    # --- NB2 Models (TAHC, UTAHC, CHORA) ---
-    if "DUMMY" in desc and ("TAHC" in desc or "UTAHC" in desc): return 0.355, 4
-    if "P13C" in desc and "UTAHC" in desc: return 0.370, 4
-    if "TAHC" in desc or "UTAHC" in desc or "CHORA" in desc: return 0.380, 4
-    
-    # --- Fallbacks กรณีไม่ตรงกับฐานข้อมูลด้านบน ---
-    if furnace_id == "NB2":
+    if furnace_id == "NB1":
+        if "16XHP" in desc: return 1.041, 2
+        if "27XHP" in desc: return 0.887, 2
+        if "12XHP" in desc and "SU2" in desc: return 0.580, 2
+        if "CMFB" in desc: return 0.640, 2
+        if "D15B" in desc or "DNGA" in desc: return 0.610, 2
+        if "Y4L" in desc: return 0.790, 2
+        if "SU2" in desc: return 0.660, 2
+        if "P42QRMY25" in desc: return 0.765, 2
+        if "P42QR" in desc or "W42JK" in desc: return 0.760, 2
+        if "F44" in desc or "F48" in desc: return 0.660, 2
+        if "DEMIO" in desc and "DE" in desc: return 0.565, 2
+        if "DEMIO" in desc and "CE" in desc: return 0.590, 2
+        if "5H45V" in desc: return 0.670, 2
+        if "KN9 #6" in desc: return 0.760, 1
+        if "KN9" in desc: return 0.790, 2
+        if "D12A" in desc: return 0.790, 2
+        if "T36" in desc: return 0.790, 2
+        if "N117" in desc: return 0.790, 2
+        if "YR9" in desc: return 0.790, 2
+        if "P13C" in desc and "RAD" in desc: return 0.518, 2
+        return 0.660, 2 
+
+    elif furnace_id == "NB2":
+        if "DUMMY" in desc and ("TAHC" in desc or "UTAHC" in desc): return 0.355, 4
+        if "P13C" in desc and "UTAHC" in desc: return 0.370, 4
+        if "TAHC" in desc or "UTAHC" in desc or "CHORA" in desc: return 0.380, 4
         return 0.380, 4
+
     elif furnace_id == "NB3":
+        if "KE8" in desc: return 0.370, 3
+        if any(kw in desc for kw in ["X11C", "T34", "RBC", "K2"]): return 0.383, 3
+        if "J4LL" in desc: return 0.383, 2 
+        if "BTM N175" in desc: return 1.280, 2
+        if "BTM N173" in desc: return 1.400, 2
+        if "BTM M48" in desc: return 1.435, 1
+        if "EVO" in desc or "CORION" in desc: return 0.463, 3
         return 0.463, 3
-    else: # NB1
-        return 0.660, 2
+        
+    return 0.660, 2
 
 # ==============================================================================
 # 4. ส่วนของหน้าจอ Streamlit (UI)
@@ -195,7 +185,6 @@ with col1:
     else:
         current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
 
-# กำหนดความเร็วสายพานอัตโนมัติตามเตา
 default_speeds = {
     "NB1": 1.40,
     "NB2": 1.56,
@@ -218,7 +207,7 @@ with col2:
 st.markdown("---")
 
 # ==============================================================================
-# 7. ประมวลผลข้อมูลชิ้นงาน (คำนวณคิวและตำแหน่ง)
+# 7. ประมวลผลข้อมูลชิ้นงาน
 # ==============================================================================
 df_pieces = pd.DataFrame()
 
@@ -239,7 +228,6 @@ if uploaded_excels:
             df_schedule = df_schedule.dropna(subset=['Start Time', 'Quantity'])
             df_schedule = df_schedule[df_schedule['Quantity'] > 0]
             
-            # เรียงตามเวลา Start Time
             df_schedule['Start Time'] = pd.to_datetime(df_schedule['Start Time'])
             df_schedule = df_schedule.sort_values('Start Time')
             
@@ -260,14 +248,11 @@ if uploaded_excels:
                 
                 ref = str(row['Reference']) if 'Reference' in df_schedule.columns else ""
                 
-                # ดึงระยะ Pitch และจำนวนชิ้นต่อกล่อง
                 pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
                 interval_s = pitch_m / belt_speed_ms
                 
-                # คำนวณจำนวนกล่องที่ต้องโหลดลงสายพาน (ปัดเศษขึ้น)
                 rows_to_load = int(math.ceil(qty / pieces_per_pitch))
                 
-                # ระบบคิว: ห้ามโหลดทับซ้อนกัน หากพนักงานยิงเวลาช้า ให้ยึดเวลาช้าตามจริง
                 if next_available_time is None or start_t > next_available_time:
                     current_load_time = start_t
                 else:
@@ -402,7 +387,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# 9. Time Slider & Manual Inputs
+# 9. Time Slider & Manual Inputs (Two-way binding)
 # ------------------------------------------------------------------------------
 if not df_pieces.empty:
     st.markdown("---")
