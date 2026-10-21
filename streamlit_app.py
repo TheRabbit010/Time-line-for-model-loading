@@ -302,12 +302,21 @@ df_current = pd.DataFrame()
 if not df_pieces.empty:
     min_time = df_pieces['LoadTime'].min()
     max_time = df_pieces['LoadTime'].max() + pd.Timedelta(minutes=90) 
+    min_dt = min_time.to_pydatetime()
+    max_dt = max_time.to_pydatetime()
     
-    if 'sim_time_state' not in st.session_state:
-        st.session_state.sim_time_state = min_time.to_pydatetime()
+    # --------------------------------------------------------------------------
+    # Initialize unified states for slider and inputs sync
+    # --------------------------------------------------------------------------
+    if 'current_sim_time' not in st.session_state or st.session_state.current_sim_time < min_dt or st.session_state.current_sim_time > max_dt:
+        st.session_state.current_sim_time = min_dt
+        st.session_state.date_input_val = min_dt.date()
+        st.session_state.time_input_val = min_dt.strftime("%H:%M:%S")
+        st.session_state.sim_time_slider = min_dt
         
-    current_sim = st.session_state.sim_time_state
+    current_sim = st.session_state.current_sim_time
     
+    # คำนวณตำแหน่งจากเวลาจำลอง ณ ปัจจุบัน
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
     df_pieces['Position'] = df_pieces['Elapsed_s'] * df_pieces['Speed_ms']
     
@@ -363,69 +372,73 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# 9. Time Slider & Manual Inputs
+# 9. Time Slider & Manual Inputs (ระบบ Two-way binding)
 # ------------------------------------------------------------------------------
 if not df_pieces.empty:
     st.markdown("---")
     st.markdown("### ⏱️ ควบคุมเวลาจำลอง (Simulation Time)")
     
-    # ฟังก์ชันอัปเดตเวลาจากการลาก Slider
-    def update_sim_time():
-        st.session_state.sim_time_state = st.session_state.sim_time_slider
-        
-    # ฟังก์ชันอัปเดตเวลาจากการพิมพ์ช่อง Date/Time
-    def update_from_text():
+    # Callback เมื่อมีการขยับ Slider
+    def on_slider_change():
+        new_dt = st.session_state.sim_time_slider
+        st.session_state.current_sim_time = new_dt
+        st.session_state.date_input_val = new_dt.date()
+        st.session_state.time_input_val = new_dt.strftime("%H:%M:%S")
+
+    # Callback เมื่อมีการพิมพ์เวลา หรือเปลี่ยนวันที่เอง
+    def on_input_change():
         try:
-            input_d = st.session_state.date_input_val
-            input_t_str = st.session_state.time_input_val
-            input_t = pd.to_datetime(input_t_str, format="%H:%M:%S").time()
-            new_dt = datetime.combine(input_d, input_t)
+            d = st.session_state.date_input_val
+            t_str = st.session_state.time_input_val
+            t = pd.to_datetime(t_str, format="%H:%M:%S").time()
+            new_dt = datetime.combine(d, t)
             
-            # บล็อกไม่ให้เกินขอบเขตเวลาต่ำสุด-สูงสุด
-            if new_dt < min_time.to_pydatetime(): new_dt = min_time.to_pydatetime()
-            if new_dt > max_time.to_pydatetime(): new_dt = max_time.to_pydatetime()
+            # ตรวจสอบไม่ให้เวลาหลุดขอบเขต Slider
+            if new_dt < min_dt: new_dt = min_dt
+            if new_dt > max_dt: new_dt = max_dt
             
-            st.session_state.sim_time_state = new_dt
+            # เซ็ตค่าทั้ง Slider และ State กลางใหม่
+            st.session_state.current_sim_time = new_dt
+            st.session_state.sim_time_slider = new_dt
+            st.session_state.date_input_val = new_dt.date()
+            st.session_state.time_input_val = new_dt.strftime("%H:%M:%S")
         except ValueError:
-            pass # หากผู้ใช้กำลังพิมพ์แล้วผิด format จะปล่อยผ่านไปก่อน
+            pass # หากพิมพ์ format ผิด ให้ปล่อยผ่านโดยไม่พัง
             
     col_d, col_t = st.columns(2)
     with col_d:
         st.date_input(
             "📅 เลือกวันที่ (Date)", 
-            value=st.session_state.sim_time_state.date(),
-            min_value=min_time.date(),
-            max_value=max_time.date(),
+            min_value=min_dt.date(),
+            max_value=max_dt.date(),
             key="date_input_val",
-            on_change=update_from_text
+            on_change=on_input_change
         )
     with col_t:
         st.text_input(
             "⏰ ป้อนเวลา (Time) เช่น 19:32:00", 
-            value=st.session_state.sim_time_state.strftime("%H:%M:%S"),
             key="time_input_val",
-            on_change=update_from_text,
-            help="กรุณาป้อนเวลาในรูปแบบ ชั่วโมง:นาที:วินาที (HH:MM:SS) ตัวอย่างการกรอกที่ถูกต้อง: 19:32:00"
+            on_change=on_input_change,
+            help="กรุณาป้อนเวลาในรูปแบบ ชั่วโมง:นาที:วินาที (HH:MM:SS) ตัวอย่าง: 19:32:00"
         )
     
     # แจ้งเตือนกรณีพิมพ์ Format เวลาไม่ถูกต้อง
     try:
         pd.to_datetime(st.session_state.time_input_val, format="%H:%M:%S")
     except ValueError:
-        st.error("⚠️ รูปแบบเวลาไม่ถูกต้อง! กรุณาป้อนเวลาในรูปแบบ HH:MM:SS (ตัวอย่างที่ถูกต้อง: 19:32:00)")
+        st.error("⚠️ รูปแบบเวลาไม่ถูกต้อง! กรุณาป้อนเวลาในรูปแบบ HH:MM:SS (เช่น 19:32:00)")
 
-    sim_time = st.slider(
+    st.slider(
         "ลากเพื่อเลื่อนดูเวลาจำลอง (Slide to Simulator Time):", 
-        min_value=min_time.to_pydatetime(), 
-        max_value=max_time.to_pydatetime(), 
-        value=st.session_state.sim_time_state, 
-        step=timedelta(seconds=1),  # ปรับความละเอียดให้เลื่อนระดับวินาทีได้
+        min_value=min_dt, 
+        max_value=max_dt, 
+        step=timedelta(seconds=1), # เลื่อนได้ละเอียดระดับวินาที
         format="YYYY-MM-DD HH:mm:ss",
         key="sim_time_slider",
-        on_change=update_sim_time
+        on_change=on_slider_change
     )
     
-    st.markdown(f"### 📋 สรุปจำนวนชิ้นงานในเตา ณ เวลา **{st.session_state.sim_time_state.strftime('%Y-%m-%d %H:%M:%S')}**")
+    st.markdown(f"### 📋 สรุปจำนวนชิ้นงานในเตา ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
     if not df_current.empty:
         bins = [0] + df_zones["End"].tolist()
         labels = df_zones["Name"].tolist()
