@@ -209,7 +209,6 @@ st.markdown("---")
 # ==============================================================================
 # 7. ประมวลผลข้อมูลชิ้นงาน
 # ==============================================================================
-# คำนวณความยาวรวมเตาก่อน เพื่อนำไปใช้คำนวณเวลาออกเตา (Exit Time)
 zones = FURNACE_ZONE_DATA[current_nb]
 cumulative_len = 0
 furnace_zones_df = []
@@ -291,8 +290,13 @@ if uploaded_excels:
             df_pieces = pd.DataFrame(pieces_list)
             if not df_pieces.empty:
                 df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
-                # คำนวณเวลาที่ชิ้นงานจะออกจากเตา (Exit Time)
+                # คำนวณเวลาออกเตา
                 df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(total_furnace_length / df_pieces['Speed_ms'], unit='s')
+                # สร้างชื่อรุ่นพร้อม Reference สำหรับใช้แสดงผลให้ตรงกันทั้งหมด
+                df_pieces['Display_Model'] = df_pieces.apply(
+                    lambda x: f"{x['Model']} ({x['Reference']})" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
+                    axis=1
+                )
         else:
             st.error(f"❌ ไฟล์ Excel ต้องมีคอลัมน์ต่อไปนี้: {', '.join(required_cols)}")
 
@@ -337,13 +341,14 @@ if not df_pieces.empty:
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
     df_pieces['Position'] = df_pieces['Elapsed_s'] * df_pieces['Speed_ms']
     
-    df_current = df_pieces[(df_pieces['Position'] >= 0) & (df_pieces['Position'] <= total_furnace_length)]
+    # ใช้ .copy() เพื่อป้องกัน SettingWithCopyWarning
+    df_current = df_pieces[(df_pieces['Position'] >= 0) & (df_pieces['Position'] <= total_furnace_length)].copy()
     
     color_sequence = px.colors.qualitative.Plotly
     
     if not df_current.empty:
-        for i, (model_name, group) in enumerate(df_current.groupby('Model')):
-            # รวบรวมข้อมูล LoadTime และ ExitTime ใส่ Customdata Array
+        # Group by Display_Model (รวม Model กับ Reference แล้ว)
+        for i, (display_model_name, group) in enumerate(df_current.groupby('Display_Model')):
             customdata = np.stack((
                 group['LoadTime'].dt.strftime('%H:%M:%S'),
                 group['ExitTime'].dt.strftime('%H:%M:%S')
@@ -351,10 +356,9 @@ if not df_pieces.empty:
 
             fig.add_trace(go.Scatter(
                 x=group['Position'], y=[1.2] * len(group),
-                mode="markers", name=model_name,
+                mode="markers", name=display_model_name, # แสดงชื่อ Model (Reference) ใน Legend
                 marker=dict(symbol="square", size=12, color=color_sequence[i % len(color_sequence)], line=dict(width=1, color="black")),
-                # อัปเดต Hover Template ให้แสดงเวลาออก (Exit time)
-                hovertemplate=f"<b>{model_name}</b><br>ตำแหน่ง: %{{x:.2f}} ม.<br>โหลดเข้า: %{{customdata[0]}}<br>ออกเตา: %{{customdata[1]}}<extra></extra>",
+                hovertemplate=f"<b>{display_model_name}</b><br>ตำแหน่ง: %{{x:.2f}} ม.<br>โหลดเข้า: %{{customdata[0]}}<br>ออกเตา: %{{customdata[1]}}<extra></extra>",
                 customdata=customdata
             ))
 
@@ -396,7 +400,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# 9. Time Slider & Manual Inputs (Two-way binding)
+# 9. Time Slider & Manual Inputs
 # ------------------------------------------------------------------------------
 if not df_pieces.empty:
     st.markdown("---")
@@ -458,7 +462,7 @@ if not df_pieces.empty:
     )
     
     # ==============================================================================
-    # 10. ตารางรายละเอียดรายโซน (บังคับแสดงทุกโซน)
+    # 10. ตารางรายละเอียดรายโซน
     # ==============================================================================
     st.markdown(f"### 📋 รายละเอียดชิ้นงานรายโซน ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
     
@@ -466,11 +470,7 @@ if not df_pieces.empty:
         bins = [0] + df_zones["End"].tolist()
         df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=all_zone_labels, right=True)
         
-        df_current['Display_Model'] = df_current.apply(
-            lambda x: f"{x['Model']}\n{x['Reference']}" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
-            axis=1
-        )
-        
+        # ใช้ Display_Model เดียวกันกับที่แสดงในกราฟ (Model + Reference) เพื่อความสม่ำเสมอ
         wip_summary = df_current.groupby(['Zone', 'Display_Model'], observed=False).agg(
             Box_Count=('Display_Model', 'size'),
             Multiplier=('Pieces_in_Box', 'first') 
@@ -480,19 +480,19 @@ if not df_pieces.empty:
         wip_summary['Quantity'] = wip_summary['Box_Count'] * wip_summary['Multiplier']
         
         wip_pivot = wip_summary.pivot(index='Display_Model', columns='Zone', values='Quantity').fillna(0).astype(int)
-        wip_pivot.index.name = 'Model'
+        wip_pivot.index.name = 'Model (Reference)'
         
         wip_pivot = wip_pivot.reindex(columns=all_zone_labels, fill_value=0)
         
         st.dataframe(wip_pivot, use_container_width=True)
     else:
         empty_df = pd.DataFrame(columns=all_zone_labels)
-        empty_df.index.name = 'Model'
+        empty_df.index.name = 'Model (Reference)'
         st.dataframe(empty_df, use_container_width=True)
         wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model', 'Box_Count', 'Multiplier', 'Quantity'])
 
     # ==============================================================================
-    # 11. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (บังคับแสดงทุกกล่อง)
+    # 11. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ
     # ==============================================================================
     st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
     
@@ -536,7 +536,8 @@ if not df_pieces.empty:
                     st.markdown(f"### รวม: {total} ชิ้น")
                     if total > 0:
                         for _, r in df_pg.iterrows():
-                            model_name_inline = r['Display_Model'].replace('\n', ' ')
+                            # แสดงชื่อรุ่นตามด้วย Reference ในบรรทัดเดียว
+                            model_name_inline = r['Display_Model']
                             st.caption(f"• {model_name_inline} : {int(r['Quantity'])} ชิ้น")
                     else:
                         st.caption("ไม่มีชิ้นงาน")
