@@ -184,8 +184,25 @@ with col1:
     else:
         current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
 
+# กำหนดความเร็วสายพานเริ่มต้นตามประเภทเตา
+default_speeds = {
+    "NB1": 1.40,
+    "NB2": 1.56,
+    "NB3": 1.27
+}
+# ดึงค่า default ของเตาที่เลือกปัจจุบันมาใช้งาน
+default_speed_for_current_nb = default_speeds.get(current_nb, 1.40)
+
 with col2:
-    belt_speed_m_min = st.number_input("ความเร็วสายพาน (เมตร/นาที)", min_value=0.1, max_value=5.0, value=1.40, step=0.10, format="%.2f")
+    # ค่า value จะปรับเปลี่ยนตามเตา แต่ผู้ใช้ยังพิมพ์ทับ/เปลี่ยนตัวเลขในช่องได้
+    belt_speed_m_min = st.number_input(
+        "ความเร็วสายพาน (เมตร/นาที)", 
+        min_value=0.1, 
+        max_value=5.0, 
+        value=default_speed_for_current_nb, 
+        step=0.10, 
+        format="%.2f"
+    )
     belt_speed_ms = belt_speed_m_min / 60.0  
     st.caption("ℹ️ *ระยะห่าง (Pitch) และการจัดเรียงถูกคำนวณอัตโนมัติจากฐานข้อมูลตามรุ่น*")
 
