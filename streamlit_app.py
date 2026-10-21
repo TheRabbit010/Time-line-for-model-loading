@@ -115,31 +115,20 @@ def get_pitch_for_model(description):
 # ==============================================================================
 st.set_page_config(page_title="Furnace Product Simulation", page_icon="🔥", layout="wide")
 
-current_nb = "NB3" # ค่าเริ่มต้น
+# ------------------------------------------------------------------------------
+# Sidebar - เหลือแค่อัปโหลด .PAQ อย่างเดียว
+# ------------------------------------------------------------------------------
+current_nb_detected = None
 
-# ------------------------------------------------------------------------------
-# Sidebar
-# ------------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 1. กำหนดข้อมูลเตาเบื้องต้น")
-    
-    st.markdown("**(Option 1) อัปโหลดไฟล์ .PAQ**")
+    st.markdown("### 1. อัปโหลดไฟล์ข้อมูล Datapaq (.PAQ)")
+    st.caption("อัปโหลดเพื่อระบุเตาอัตโนมัติ (ไม่บังคับ)")
     uploaded_file = st.file_uploader("📂 ลากไฟล์ .PAQ มาวางที่นี่", type=["paq"])
 
     if uploaded_file is not None:
         filename = uploaded_file.name
-        current_nb = identify_furnace_type(filename)
-        st.success(f"✅ อัปโหลดไฟล์สำเร็จ:\n`{filename}`")
-        st.info(f"📍 ระบบตรวจพบเตา: **{current_nb}** อัตโนมัติ")
-    else:
-        st.markdown("**(Option 2) หรือเลือกเตาเอง**")
-        current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
-        
-    st.markdown("---")
-    st.markdown("### ⚙️ 2. ตั้งค่าพารามิเตอร์เตา")
-    # ตั้งค่าความเร็วสายพาน
-    belt_speed_m_min = st.number_input("ความเร็วสายพาน (เมตร/นาที)", min_value=0.1, max_value=5.0, value=1.5, step=0.1)
-    belt_speed_ms = belt_speed_m_min / 60.0  # แปลงเป็น เมตร/วินาที
+        current_nb_detected = identify_furnace_type(filename)
+        st.success(f"✅ อัปโหลดไฟล์ .PAQ สำเร็จ")
 
 # ------------------------------------------------------------------------------
 # Main Page
@@ -150,18 +139,44 @@ st.markdown("ระบบจำลองตำแหน่งชิ้นงา�
 # ==============================================================================
 # 4. อัปโหลดและประมวลผลข้อมูล Excel
 # ==============================================================================
-st.markdown("### 📥 3. อัปโหลดแผนการผลิต (Excel)")
+st.markdown("### 📥 2. อัปโหลดแผนการผลิต (Excel)")
 uploaded_excels = st.file_uploader(
-    f"อัปโหลดไฟล์ข้อมูลแผนการผลิตของเตา {current_nb} (.xlsx หรือ .xls สามารถเลือกหลายไฟล์พร้อมกันได้)", 
+    "อัปโหลดไฟล์ข้อมูลแผนการผลิตของเตา (.xlsx หรือ .xls สามารถเลือกหลายไฟล์พร้อมกันได้)", 
     type=["xlsx", "xls"], 
     accept_multiple_files=True
 )
 
+if uploaded_excels:
+    st.success(f"✅ อัปโหลดไฟล์ Excel สำเร็จจำนวน {len(uploaded_excels)} ไฟล์")
+
+st.markdown("---")
+
+# ==============================================================================
+# 5. ตั้งค่าพารามิเตอร์เตา (ย้ายมาไว้ใต้ส่วนอัปโหลด)
+# ==============================================================================
+st.markdown("### ⚙️ 3. ตั้งค่าพารามิเตอร์เตา")
+col1, col2 = st.columns(2)
+
+with col1:
+    if current_nb_detected:
+        st.info(f"🔥 ระบบตรวจพบเตาจากไฟล์ .PAQ: **{current_nb_detected}**")
+        current_nb = current_nb_detected
+    else:
+        current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
+
+with col2:
+    # เพิ่ม format="%.2f" เพื่อให้แสดงเป็นทศนิยม 2 ตำแหน่งเหมือนในภาพ
+    belt_speed_m_min = st.number_input("ความเร็วสายพาน (เมตร/นาที)", min_value=0.1, max_value=5.0, value=1.40, step=0.10, format="%.2f")
+    belt_speed_ms = belt_speed_m_min / 60.0  # แปลงเป็น เมตร/วินาที
+
+st.markdown("---")
+
+# ==============================================================================
+# 6. ประมวลผลข้อมูลชิ้นงาน
+# ==============================================================================
 df_pieces = pd.DataFrame()
 
 if uploaded_excels:
-    st.success(f"✅ อัปโหลดไฟล์ Excel สำเร็จจำนวน {len(uploaded_excels)} ไฟล์")
-    
     dfs = []
     for file in uploaded_excels:
         try:
@@ -173,32 +188,24 @@ if uploaded_excels:
     if dfs:
         df_schedule = pd.concat(dfs, ignore_index=True)
         
-        # ตรวจสอบว่ามีคอลัมน์ที่จำเป็นตามที่เห็นในไฟล์
         required_cols = ['Description', 'Quantity', 'Start Time']
         if all(col in df_schedule.columns for col in required_cols):
-            # กรองข้อมูลเอาเฉพาะแถวที่มีจำนวนมากกว่า 0 และมีเวลาเริ่ม
             df_schedule = df_schedule.dropna(subset=['Start Time', 'Quantity'])
             df_schedule = df_schedule[df_schedule['Quantity'] > 0]
             
             with st.expander("ดูข้อมูลแผนการผลิต (Data Preview)"):
                 st.dataframe(df_schedule[required_cols], use_container_width=True)
                 
-            # กระจายข้อมูลชิ้นงานแต่ละชิ้นตามความเร็วและระยะห่าง (Pitch)
             pieces_list = []
             for _, row in df_schedule.iterrows():
                 qty = int(row['Quantity'])
                 start_t = pd.to_datetime(row['Start Time'])
                 desc = str(row['Description'])
                 
-                # ดึงระยะห่าง (Pitch) ของรุ่นนั้นๆ
                 pitch_m = get_pitch_for_model(desc)
-                
-                # คำนวณช่วงเวลาที่ต้องรอระหว่างชิ้น (วินาที) = ระยะห่าง / ความเร็ว
                 interval_s = pitch_m / belt_speed_ms
                 
-                # จำลองการโหลดชิ้นงานทีละชิ้นตามเวลา
                 for i in range(qty):
-                    # ชิ้นแรกเริ่มที่ Start Time ชิ้นต่อไปบวกเวลา Interval เข้าไป
                     load_t = start_t + pd.Timedelta(seconds=i * interval_s)
                     pieces_list.append({
                         'Model': desc,
@@ -213,13 +220,10 @@ if uploaded_excels:
         else:
             st.error(f"❌ ไฟล์ Excel ต้องมีคอลัมน์ต่อไปนี้: {', '.join(required_cols)}")
 
-st.markdown("---")
-
 # ==============================================================================
-# 5. กราฟจำลอง Simulation
+# 7. กราฟจำลอง Simulation
 # ==============================================================================
 
-# คำนวณความยาวสะสมของแต่ละ Zone ของเตาที่ตรวจจับได้
 zones = FURNACE_ZONE_DATA[current_nb]
 cumulative_len = 0
 furnace_zones_df = []
@@ -235,10 +239,8 @@ for z in zones:
 total_furnace_length = cumulative_len
 df_zones = pd.DataFrame(furnace_zones_df)
 
-# สร้างแกนกราฟ
 fig = go.Figure()
 
-# วาดแถบของแต่ละ Zone
 for idx, row in df_zones.iterrows():
     fig.add_shape(
         type="rect", x0=row["Start"], x1=row["End"], y0=0, y1=1,
@@ -251,35 +253,27 @@ for idx, row in df_zones.iterrows():
         font=dict(size=11, color="black" if row["Type"] in ["Dryer", "Xfer", "Cooling"] else "white")
     )
 
-# วาดเส้นแกนสายพาน
 fig.add_shape(
     type="line", x0=0, x1=total_furnace_length, y0=1.2, y1=1.2,
     line=dict(color="gray", width=2, dash="dot"), layer="below"
 )
 
-# ------------------------------------------------------------------------------
-# หากมีการอัปโหลด Excel และคำนวณชิ้นงานได้
-# ------------------------------------------------------------------------------
 df_current = pd.DataFrame()
 
 if not df_pieces.empty:
     min_time = df_pieces['LoadTime'].min()
     max_time = df_pieces['LoadTime'].max() + pd.Timedelta(minutes=90) 
     
-    # เก็บค่า sim_time ไว้ใน State เพื่อนำมาวาดกราฟ
     if 'sim_time_state' not in st.session_state:
         st.session_state.sim_time_state = min_time.to_pydatetime()
         
     current_sim = st.session_state.sim_time_state
     
-    # คำนวณระยะทาง = เวลาที่ผ่านไป (วินาที) * ความเร็วสายพาน (เมตร/วินาที)
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
     df_pieces['Position'] = df_pieces['Elapsed_s'] * df_pieces['Speed_ms']
     
-    # กรองเฉพาะชิ้นงานที่กำลังอยู่ในเตา ณ เวลาปัจจุบัน
     df_current = df_pieces[(df_pieces['Position'] >= 0) & (df_pieces['Position'] <= total_furnace_length)]
     
-    # วาดชิ้นงานลงในกราฟ โดยแยกสีตาม Model
     color_sequence = px.colors.qualitative.Plotly
     
     if not df_current.empty:
@@ -292,11 +286,8 @@ if not df_pieces.empty:
                 customdata=group['LoadTime'].dt.strftime('%H:%M:%S')
             ))
 
-# ------------------------------------------------------------------------------
-# หากยังไม่ได้อัปโหลด Excel (โชว์ภาพตัวอย่าง Static)
-# ------------------------------------------------------------------------------
 else:
-    st.info("💡 **ข้อมูลการโหลดชิ้นงานยังว่างเปล่า** (ด้านล่างคือภาพตัวอย่าง) อัปโหลดไฟล์ Excel เพื่อดูตำแหน่งจริงและเวลาที่สัมพันธ์กัน")
+    st.info("💡 **ข้อมูลการโหลดชิ้นงานยังว่างเปล่า** อัปโหลดไฟล์ Excel ด้านบนเพื่อดูตำแหน่งจริงและเวลาที่สัมพันธ์กัน")
     selected_model = st.selectbox("เลือกโมเดลเพื่อดูตัวอย่าง (Sample Model):", MODEL_DB["Model"].tolist())
     
     pitch_mm = MODEL_DB.loc[MODEL_DB["Model"] == selected_model, "Pitch (mm)"].values[0]
@@ -310,9 +301,6 @@ else:
         hovertemplate="ตำแหน่ง: %{x:.2f} เมตร<extra></extra>"
     ))
 
-# ------------------------------------------------------------------------------
-# นำภาพ Layout เตาขึ้นไปวางด้านบนโครงสร้าง
-# ------------------------------------------------------------------------------
 img_file_sim = IMAGE_MAPPING.get(current_nb)
 y_range = [-0.2, 1.8] 
 
@@ -327,7 +315,6 @@ if os.path.exists(img_file_sim):
     )
     y_range = [-0.2, 3.5]
 
-# ตั้งค่ากราฟ
 fig.update_layout(
     title=f"Furnace Timeline: {current_nb} (Total Length: {total_furnace_length:.2f} m)",
     xaxis=dict(title="Distance (Meters)", range=[0, total_furnace_length], tickmode="linear", tick0=0, dtick=2),
@@ -337,16 +324,14 @@ fig.update_layout(
     showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
 )
 
-# เรนเดอร์กราฟ
 st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# 6. Time Slider (แสดงเมื่อมีข้อมูล)
+# 8. Time Slider
 # ------------------------------------------------------------------------------
 if not df_pieces.empty:
     st.markdown("---")
     
-    # อัปเดต state เมื่อมีการลาก Slider
     def update_sim_time():
         st.session_state.sim_time_state = st.session_state.sim_time_slider
         
@@ -361,7 +346,6 @@ if not df_pieces.empty:
         on_change=update_sim_time
     )
     
-    # แสดงตารางสรุป
     st.markdown(f"### 📋 สรุปจำนวนชิ้นงานในเตา ณ เวลา **{st.session_state.sim_time_state.strftime('%Y-%m-%d %H:%M')}**")
     if not df_current.empty:
         bins = [0] + df_zones["End"].tolist()
