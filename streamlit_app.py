@@ -89,49 +89,60 @@ IMAGE_MAPPING = {
 }
 
 # ==============================================================================
-# 3. ฐานข้อมูล Model Pitch และ Pieces per Pitch
+# 3. ฐานข้อมูล Model Pitch และ Pieces per Pitch (แมปปิ้งครอบคลุมทุกรุ่น)
 # ==============================================================================
 def get_model_info(description, furnace_id):
+    """
+    รับชื่อ Description และ Furnace ID 
+    เพื่อคืนค่า (Pitch เป็นเมตร, จำนวนชิ้นต่อกล่อง/แถว)
+    """
     desc = str(description).upper()
     
-    if furnace_id == "NB1":
-        if "KN9 #6" in desc: return 760 / 1000.0, 1
-        if "KN9" in desc: return 790 / 1000.0, 2
-        if "D12A" in desc: return 790 / 1000.0, 2
-        if "Y4L" in desc: return 790 / 1000.0, 2
-        if "T36" in desc: return 790 / 1000.0, 2
-        if "N117" in desc: return 790 / 1000.0, 2
-        if "YR9" in desc: return 790 / 1000.0, 2
-        if "F44" in desc or "F48" in desc: return 660 / 1000.0, 2
-        if "DEMIO DE" in desc: return 565 / 1000.0, 2
-        if "DEMIO CE" in desc: return 590 / 1000.0, 2
-        if "CMFB" in desc: return 640 / 1000.0, 2
-        if "P42QRMY25" in desc: return 765 / 1000.0, 2
-        if "P42QR" in desc or "W42JK" in desc: return 760 / 1000.0, 2
-        if "SU2" in desc and "RAD" not in desc: return 660 / 1000.0, 2
-        if "DNGA" in desc or "D15B" in desc: return 610 / 1000.0, 2
-        if "5H45V" in desc: return 670 / 1000.0, 2
-        if "RAD 12XHP SU2" in desc: return 580 / 1000.0, 2
-        if "RAD16XHP" in desc: return 1041 / 1000.0, 2
-        if "RAD27XHP" in desc: return 887 / 1000.0, 2
-        if "RAD P13C" in desc: return 518 / 1000.0, 2
-        return 660 / 1000.0, 2 
-
-    elif furnace_id == "NB2":
-        if "DUMMY" in desc: return 355 / 1000.0, 4
-        if "P13C" in desc: return 370 / 1000.0, 4
-        return 380 / 1000.0, 4
-
+    # --- Universal Matchers (พบใน Excel บ่อย) ---
+    if "16XHP" in desc: return 1.041, 2
+    if "27XHP" in desc: return 0.887, 2
+    if "12XHP" in desc and "SU2" in desc: return 0.580, 2
+    
+    if "CMFB" in desc: return 0.640, 2
+    if "D15B" in desc or "DNGA" in desc: return 0.610, 2
+    if "Y4L" in desc: return 0.790, 2
+    if "SU2" in desc: return 0.660, 2
+    
+    if "P42QRMY25" in desc: return 0.765, 2
+    if "P42QR" in desc or "W42JK" in desc: return 0.760, 2
+    if "F44" in desc or "F48" in desc: return 0.660, 2
+    if "DEMIO" in desc and "DE" in desc: return 0.565, 2
+    if "DEMIO" in desc and "CE" in desc: return 0.590, 2
+    if "5H45V" in desc: return 0.670, 2
+    if "KN9 #6" in desc: return 0.760, 1
+    if "KN9" in desc: return 0.790, 2
+    if "D12A" in desc: return 0.790, 2
+    if "T36" in desc: return 0.790, 2
+    if "N117" in desc: return 0.790, 2
+    if "YR9" in desc: return 0.790, 2
+    if "P13C" in desc and "RAD" in desc: return 0.518, 2
+    
+    # --- NB3 Models (BTM, EVO, CORION) ---
+    if "KE8" in desc: return 0.370, 3
+    if any(kw in desc for kw in ["X11C", "T34", "RBC", "K2"]): return 0.383, 3
+    if "J4LL" in desc: return 0.383, 2 
+    if "BTM N175" in desc: return 1.280, 2
+    if "BTM N173" in desc: return 1.400, 2
+    if "BTM M48" in desc: return 1.435, 1
+    if "EVO" in desc or "CORION" in desc: return 0.463, 3
+    
+    # --- NB2 Models (TAHC, UTAHC, CHORA) ---
+    if "DUMMY" in desc and ("TAHC" in desc or "UTAHC" in desc): return 0.355, 4
+    if "P13C" in desc and "UTAHC" in desc: return 0.370, 4
+    if "TAHC" in desc or "UTAHC" in desc or "CHORA" in desc: return 0.380, 4
+    
+    # --- Fallbacks กรณีไม่ตรงกับฐานข้อมูลด้านบน ---
+    if furnace_id == "NB2":
+        return 0.380, 4
     elif furnace_id == "NB3":
-        if "KE8" in desc: return 370 / 1000.0, 3
-        if any(kw in desc for kw in ["X11C", "T34", "D12A", "RBC", "K2"]): return 383 / 1000.0, 3
-        if "J4LL" in desc: return 383 / 1000.0, 2 
-        if "BTM N175" in desc: return 1280 / 1000.0, 2
-        if "BTM N173" in desc: return 1400 / 1000.0, 2
-        if "BTM M48" in desc: return 1435 / 1000.0, 1
-        return 463 / 1000.0, 3
-        
-    return 660 / 1000.0, 2
+        return 0.463, 3
+    else: # NB1
+        return 0.660, 2
 
 # ==============================================================================
 # 4. ส่วนของหน้าจอ Streamlit (UI)
@@ -184,7 +195,7 @@ with col1:
     else:
         current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
 
-# กำหนดความเร็วสายพานเริ่มต้นตามประเภทเตา
+# กำหนดความเร็วสายพานอัตโนมัติตามเตา
 default_speeds = {
     "NB1": 1.40,
     "NB2": 1.56,
@@ -198,7 +209,7 @@ with col2:
         min_value=0.1, 
         max_value=5.0, 
         value=default_speed_for_current_nb, 
-        step=0.10, 
+        step=0.01, 
         format="%.2f"
     )
     belt_speed_ms = belt_speed_m_min / 60.0  
@@ -207,7 +218,7 @@ with col2:
 st.markdown("---")
 
 # ==============================================================================
-# 7. ประมวลผลข้อมูลชิ้นงาน
+# 7. ประมวลผลข้อมูลชิ้นงาน (คำนวณคิวและตำแหน่ง)
 # ==============================================================================
 df_pieces = pd.DataFrame()
 
@@ -228,6 +239,7 @@ if uploaded_excels:
             df_schedule = df_schedule.dropna(subset=['Start Time', 'Quantity'])
             df_schedule = df_schedule[df_schedule['Quantity'] > 0]
             
+            # เรียงตามเวลา Start Time
             df_schedule['Start Time'] = pd.to_datetime(df_schedule['Start Time'])
             df_schedule = df_schedule.sort_values('Start Time')
             
@@ -248,11 +260,14 @@ if uploaded_excels:
                 
                 ref = str(row['Reference']) if 'Reference' in df_schedule.columns else ""
                 
+                # ดึงระยะ Pitch และจำนวนชิ้นต่อกล่อง
                 pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
                 interval_s = pitch_m / belt_speed_ms
                 
+                # คำนวณจำนวนกล่องที่ต้องโหลดลงสายพาน (ปัดเศษขึ้น)
                 rows_to_load = int(math.ceil(qty / pieces_per_pitch))
                 
+                # ระบบคิว: ห้ามโหลดทับซ้อนกัน หากพนักงานยิงเวลาช้า ให้ยึดเวลาช้าตามจริง
                 if next_available_time is None or start_t > next_available_time:
                     current_load_time = start_t
                 else:
@@ -295,6 +310,7 @@ for z in zones:
 
 total_furnace_length = cumulative_len
 df_zones = pd.DataFrame(furnace_zones_df)
+all_zone_labels = df_zones["Name"].tolist() 
 
 fig = go.Figure()
 
@@ -448,13 +464,13 @@ if not df_pieces.empty:
     )
     
     # ==============================================================================
-    # 10. ตารางรายละเอียดรายโซน (ตารางหลัก)
+    # 10. ตารางรายละเอียดรายโซน (บังคับแสดงทุกโซน)
     # ==============================================================================
     st.markdown(f"### 📋 รายละเอียดชิ้นงานรายโซน ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
+    
     if not df_current.empty:
         bins = [0] + df_zones["End"].tolist()
-        labels = df_zones["Name"].tolist()
-        df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=labels, right=True)
+        df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=all_zone_labels, right=True)
         
         df_current['Display_Model'] = df_current.apply(
             lambda x: f"{x['Model']}\n{x['Reference']}" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
@@ -472,55 +488,64 @@ if not df_pieces.empty:
         wip_pivot = wip_summary.pivot(index='Display_Model', columns='Zone', values='Quantity').fillna(0).astype(int)
         wip_pivot.index.name = 'Model'
         
+        # บังคับให้แสดงทุกคอลัมน์โซน แม้ไม่มีงาน
+        wip_pivot = wip_pivot.reindex(columns=all_zone_labels, fill_value=0)
+        
         st.dataframe(wip_pivot, use_container_width=True)
-        
-        # ==============================================================================
-        # 11. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)
-        # ==============================================================================
-        st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
-        
-        # สร้าง Mapping จากชื่อโซนย่อย (Name) ไปหา กลุ่มหลัก (Type)
-        zone_type_mapping = {z['name']: z['type'] for z in FURNACE_ZONE_DATA[current_nb]}
-        
-        # เปลี่ยนชื่อกลุ่มให้สวยงามสำหรับการแสดงผล
-        display_type_names = {
-            "Heating": "🔥 Brazing Zone (Z#1 - Z#7)",
-            "Dryer": "💨 Dryer Zone",
-            "Debinder": "♨️ Debinder Zone",
-            "Cooling": "❄️ Cooling Zone",
-            "Flux": "💧 Flux Zone",
-            "Xfer": "↔️ Transfer / Entrance",
-            "Exit": "🚪 Exit"
-        }
-        
-        # จับคู่ข้อมูลกลับไปยัง wip_summary
+    else:
+        empty_df = pd.DataFrame(columns=all_zone_labels)
+        empty_df.index.name = 'Model'
+        st.dataframe(empty_df, use_container_width=True)
+        wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model', 'Box_Count', 'Multiplier', 'Quantity'])
+
+    # ==============================================================================
+    # 11. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (บังคับแสดงทุกกล่อง)
+    # ==============================================================================
+    st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
+    
+    zone_type_mapping = {z['name']: z['type'] for z in FURNACE_ZONE_DATA[current_nb]}
+    
+    display_type_names = {
+        "Heating": "🔥 Brazing Zone (Z#1 - Z#7)",
+        "Dryer": "💨 Dryer Zone",
+        "Debinder": "♨️ Debinder Zone",
+        "Cooling": "❄️ Cooling Zone",
+        "Flux": "💧 Flux Zone",
+        "Xfer": "↔️ Transfer / Entrance",
+        "Exit": "🚪 Exit"
+    }
+    
+    ordered_types = []
+    for z in FURNACE_ZONE_DATA[current_nb]:
+        if z['type'] not in ordered_types:
+            ordered_types.append(z['type'])
+    ordered_display_groups = [display_type_names[t] for t in ordered_types]
+    
+    if not wip_summary.empty:
         wip_summary['Process_Group_Raw'] = wip_summary['Zone'].map(zone_type_mapping)
         wip_summary['Process_Group'] = wip_summary['Process_Group_Raw'].map(display_type_names)
         
-        # สรุปผลรวมแยกตามกลุ่มกระบวนการและชื่อรุ่น
         group_summary = wip_summary.groupby(['Process_Group', 'Display_Model'], observed=False)['Quantity'].sum().reset_index()
         group_summary = group_summary[group_summary['Quantity'] > 0]
-        
-        process_groups = group_summary['Process_Group'].unique()
-        
-        if len(process_groups) > 0:
-            # นำมาแสดงในรูปแบบกล่องการ์ด แบ่ง 3 คอลัมน์ต่อ 1 แถว
-            cols = st.columns(3)
-            for idx, p_group in enumerate(process_groups):
-                col = cols[idx % 3]
-                with col:
-                    df_pg = group_summary[group_summary['Process_Group'] == p_group]
-                    total = int(df_pg['Quantity'].sum())
-                    
-                    with st.container(border=True):
-                        st.markdown(f"**{p_group}**")
-                        st.markdown(f"### รวม: {total} ชิ้น")
-                        # วนลูปแสดงรายชื่อรุ่นย่อยภายในกล่อง
+    else:
+        group_summary = pd.DataFrame(columns=['Process_Group', 'Display_Model', 'Quantity'])
+    
+    if len(ordered_display_groups) > 0:
+        cols = st.columns(3)
+        for idx, p_group in enumerate(ordered_display_groups):
+            col = cols[idx % 3]
+            with col:
+                df_pg = group_summary[group_summary['Process_Group'] == p_group]
+                total = int(df_pg['Quantity'].sum()) if not df_pg.empty else 0
+                
+                with st.container(border=True):
+                    st.markdown(f"**{p_group}**")
+                    st.markdown(f"### รวม: {total} ชิ้น")
+                    if total > 0:
                         for _, r in df_pg.iterrows():
                             model_name_inline = r['Display_Model'].replace('\n', ' ')
                             st.caption(f"• {model_name_inline} : {int(r['Quantity'])} ชิ้น")
-        else:
-            st.info("ไม่มีชิ้นงานในกระบวนการหลัก")
-
+                    else:
+                        st.caption("ไม่มีชิ้นงาน")
     else:
-        st.info("ไม่มีชิ้นงานอยู่ในเตา ณ เวลาที่เลือก")
+        st.info("ไม่มีกระบวนการหลักในเตานี้")
