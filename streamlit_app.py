@@ -96,7 +96,7 @@ ZONE_COLORS = {
 }
 
 IMAGE_MAPPING = {
-    "NB1": "Screenshot 2026-10-20 143941.png",
+    "NB1": "Screenshot 2026-10-21 083432.png", # อัปเดตไฟล์ภาพสำหรับ NB1
     "NB2": "Screenshot 2026-10-20 144037.png",
     "NB3": "Screenshot 2026-10-20 144101.png"
 }
@@ -115,9 +115,6 @@ def get_pitch_for_model(description):
 # ==============================================================================
 st.set_page_config(page_title="Furnace Product Simulation", page_icon="🔥", layout="wide")
 
-# ------------------------------------------------------------------------------
-# Sidebar - เหลือแค่อัปโหลด .PAQ อย่างเดียว
-# ------------------------------------------------------------------------------
 current_nb_detected = None
 
 with st.sidebar:
@@ -152,10 +149,10 @@ if uploaded_excels:
 st.markdown("---")
 
 # ==============================================================================
-# 5. ตั้งค่าพารามิเตอร์เตา (ย้ายมาไว้ใต้ส่วนอัปโหลด)
+# 5. ตั้งค่าพารามิเตอร์เตา 
 # ==============================================================================
 st.markdown("### ⚙️ 3. ตั้งค่าพารามิเตอร์เตา")
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     if current_nb_detected:
@@ -165,14 +162,16 @@ with col1:
         current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
 
 with col2:
-    # เพิ่ม format="%.2f" เพื่อให้แสดงเป็นทศนิยม 2 ตำแหน่งเหมือนในภาพ
     belt_speed_m_min = st.number_input("ความเร็วสายพาน (เมตร/นาที)", min_value=0.1, max_value=5.0, value=1.40, step=0.10, format="%.2f")
     belt_speed_ms = belt_speed_m_min / 60.0  # แปลงเป็น เมตร/วินาที
+
+with col3:
+    pieces_per_row = st.number_input("จำนวนชิ้นงานต่อแถว/กล่อง (Pieces/Row)", min_value=1, max_value=10, value=2, step=1)
 
 st.markdown("---")
 
 # ==============================================================================
-# 6. ประมวลผลข้อมูลชิ้นงาน
+# 6. ประมวลผลข้อมูลชิ้นงาน (เพิ่มระบบ Queue ป้องกันการซ้อนทับ)
 # ==============================================================================
 df_pieces = pd.DataFrame()
 
@@ -193,26 +192,45 @@ if uploaded_excels:
             df_schedule = df_schedule.dropna(subset=['Start Time', 'Quantity'])
             df_schedule = df_schedule[df_schedule['Quantity'] > 0]
             
+            # เรียงข้อมูลตามเวลาเพื่อให้คิวการโหลดทำงานได้ถูกต้อง (ใครมาก่อนโหลดก่อน)
+            df_schedule['Start Time'] = pd.to_datetime(df_schedule['Start Time'])
+            df_schedule = df_schedule.sort_values('Start Time')
+            
             with st.expander("ดูข้อมูลแผนการผลิต (Data Preview)"):
-                st.dataframe(df_schedule[required_cols], use_container_width=True)
+                st.dataframe(df_schedule[required_cols].head(50), use_container_width=True)
                 
             pieces_list = []
+            next_available_time = None  # ตัวแปรจำเวลาที่สายพานจะว่าง (แก้ภาพซ้อน)
+            
             for _, row in df_schedule.iterrows():
                 qty = int(row['Quantity'])
-                start_t = pd.to_datetime(row['Start Time'])
+                start_t = row['Start Time']
                 desc = str(row['Description'])
                 
                 pitch_m = get_pitch_for_model(desc)
                 interval_s = pitch_m / belt_speed_ms
                 
-                for i in range(qty):
-                    load_t = start_t + pd.Timedelta(seconds=i * interval_s)
+                # หารจำนวนชิ้นด้วย "จำนวนชิ้นต่อแถว" 
+                rows_to_load = int(np.ceil(qty / pieces_per_row))
+                
+                # ถ้ารุ่นนี้ Start Time มาก่อนที่สายพานจะว่าง ให้รอจนกว่าสายพานจะว่าง
+                if next_available_time is None or start_t > next_available_time:
+                    current_load_time = start_t
+                else:
+                    current_load_time = next_available_time
+                
+                for i in range(rows_to_load):
                     pieces_list.append({
                         'Model': desc,
-                        'LoadTime': load_t,
+                        'LoadTime': current_load_time,
                         'Pitch_m': pitch_m,
                         'Speed_ms': belt_speed_ms
                     })
+                    # ขยับเวลาโหลดกล่องถัดไป ตามระยเวลาที่ต้องใช้ (Interval)
+                    current_load_time += pd.Timedelta(seconds=interval_s)
+                
+                # อัปเดตเวลาว่างของสายพานสำหรับออเดอร์ถัดไป
+                next_available_time = current_load_time
             
             df_pieces = pd.DataFrame(pieces_list)
             if not df_pieces.empty:
