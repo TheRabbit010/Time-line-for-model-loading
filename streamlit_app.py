@@ -30,7 +30,7 @@ def identify_furnace_type(text_to_search):
     return furnace_id
 
 # ==============================================================================
-# 2. ฟังก์ชันวิเคราะห์หาเตาจากข้อมูลใน Excel (อัปเดตตรรกะตามภาพ)
+# 2. ฟังก์ชันวิเคราะห์หาเตาจากข้อมูลใน Excel
 # ==============================================================================
 def detect_furnace_from_dataframe(df):
     text_data = ""
@@ -568,14 +568,13 @@ if not df_pieces.empty:
         wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model_Table', 'Box_Count', 'Multiplier', 'Quantity'])
 
     # ==============================================================================
-    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (แสดงข้อมูล Pitch ด้วย และแยก XFER)
+    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (แสดงกราฟแท่งและข้อมูล Pitch)
     # ==============================================================================
     st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
     
     # ปรับให้แยก Process Group ของ XFER ออกตามชื่อโซน
     zone_type_mapping = {}
     for z in FURNACE_ZONE_DATA[current_nb]:
-        # ถ้าชื่อโซนมีคำว่า Xfer (ไม่ว่าจะตัวพิมพ์เล็กหรือใหญ่) ให้แยกเป็นกลุ่มของตัวเองตามชื่อนั้นเลย
         if "XFER" in z['name'].upper():
             zone_type_mapping[z['name']] = z['name']
         else:
@@ -597,7 +596,6 @@ if not df_pieces.empty:
         if t not in ordered_types:
             ordered_types.append(t)
             
-        # สร้างชื่อแสดงผลสำหรับ Xfer ที่แยกเฉพาะ (ถ้ายังไม่มีในดิกชันนารี)
         if t not in display_type_names:
             display_type_names[t] = f"↔️ {t} (จุดเชื่อมต่อ)"
             
@@ -616,6 +614,55 @@ if not df_pieces.empty:
     else:
         group_summary = pd.DataFrame(columns=['Process_Group', 'Display_Model_Table', 'Quantity', 'Box_Count'])
     
+    # --- ส่วนสร้างกราฟแท่ง (Bar Chart) ---
+    if not group_summary.empty:
+        # รวมข้อมูลสำหรับสร้างกราฟ (ไม่ต้องแยก Model)
+        chart_data = group_summary.groupby('Process_Group', observed=False).agg(
+            Quantity=('Quantity', 'sum'),
+            Box_Count=('Box_Count', 'sum')
+        ).reset_index()
+        
+        # จัดเรียงลำดับตาม ordered_display_groups
+        chart_data['Process_Group'] = pd.Categorical(chart_data['Process_Group'], categories=ordered_display_groups, ordered=True)
+        chart_data = chart_data.sort_values('Process_Group')
+        
+        # กำหนดสีแบบ Gradient ตามจำนวนชิ้นงานเพื่อให้ดูเป็นมืออาชีพ
+        fig_bar = px.bar(
+            chart_data, 
+            x='Process_Group', 
+            y='Quantity', 
+            text='Quantity',
+            labels={'Process_Group': '', 'Quantity': 'จำนวนชิ้นงาน (ชิ้น)'},
+            color='Quantity',
+            color_continuous_scale=px.colors.sequential.Blues
+        )
+        
+        fig_bar.update_traces(
+            texttemplate='<b>%{text} ชิ้น</b>', 
+            textposition='outside',
+            hovertemplate='<b>%{x}</b><br>จำนวน: %{y} ชิ้น<extra></extra>',
+            marker_line_color='rgb(8,48,107)',
+            marker_line_width=1.5,
+            opacity=0.85
+        )
+        
+        fig_bar.update_layout(
+            template='plotly_white',
+            height=400,
+            margin=dict(t=30, b=50, l=20, r=20),
+            xaxis=dict(tickangle=-45, title_font=dict(size=14)),
+            yaxis=dict(title="จำนวน (ชิ้น)", showgrid=True, gridcolor='#E5E5E5'),
+            coloraxis_showscale=False # ซ่อนแถบสีด้านขวาให้ดูคลีน
+        )
+        
+        # ปรับเพดานแกน Y ให้ตัวหนังสือบนแท่งไม่โดนตัด
+        max_qty = chart_data['Quantity'].max()
+        fig_bar.update_yaxes(range=[0, max_qty * 1.2])
+
+        st.plotly_chart(fig_bar, use_container_width=True)
+    # -----------------------------------
+
+    # --- ส่วนแสดงกล่องการ์ดสรุปข้อมูล (Cards) ---
     if len(ordered_display_groups) > 0:
         cols = st.columns(3)
         for idx, p_group in enumerate(ordered_display_groups):
