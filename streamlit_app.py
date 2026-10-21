@@ -30,7 +30,7 @@ def identify_furnace_type(text_to_search):
     return furnace_id
 
 # ==============================================================================
-# 2. ฟังก์ชันวิเคราะห์หาเตาจากข้อมูลใน Excel (อัปเดตตรรกะตามฐานข้อมูลใหม่)
+# 2. ฟังก์ชันวิเคราะห์หาเตาจากข้อมูลใน Excel (อัปเดตตรรกะตามภาพ)
 # ==============================================================================
 def detect_furnace_from_dataframe(df):
     text_data = ""
@@ -183,7 +183,7 @@ st.title("🔥 Furnace Product & Simulation")
 st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) โดยอ้างอิงจากแผนการโหลดชิ้นงานจริง")
 
 # ==============================================================================
-# 6. อัปโหลดและเตรียมข้อมูล Excel (รวมฟังก์ชันปุ่ม Reset)
+# 6. อัปโหลดและเตรียมข้อมูล Excel (มีปุ่ม Reset Data)
 # ==============================================================================
 st.markdown("### 📥 2. อัปโหลดแผนการผลิต (Excel)")
 
@@ -315,7 +315,7 @@ if not df_schedule_raw.empty:
             preview_cols.insert(0, 'Reference')
         if 'WORKCENTERLIST' in df_schedule.columns:
             preview_cols.append('WORKCENTERLIST')
-        
+            
         with st.expander("ดูข้อมูลแผนการผลิต (Data Preview)"):
             st.dataframe(df_schedule[preview_cols].head(50), use_container_width=True)
             
@@ -568,11 +568,18 @@ if not df_pieces.empty:
         wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model_Table', 'Box_Count', 'Multiplier', 'Quantity'])
 
     # ==============================================================================
-    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (แสดงข้อมูล Pitch ด้วย)
+    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (แสดงข้อมูล Pitch ด้วย และแยก XFER)
     # ==============================================================================
     st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
     
-    zone_type_mapping = {z['name']: z['type'] for z in FURNACE_ZONE_DATA[current_nb]}
+    # ปรับให้แยก Process Group ของ XFER ออกตามชื่อโซน
+    zone_type_mapping = {}
+    for z in FURNACE_ZONE_DATA[current_nb]:
+        # ถ้าชื่อโซนมีคำว่า Xfer (ไม่ว่าจะตัวพิมพ์เล็กหรือใหญ่) ให้แยกเป็นกลุ่มของตัวเองตามชื่อนั้นเลย
+        if "XFER" in z['name'].upper():
+            zone_type_mapping[z['name']] = z['name']
+        else:
+            zone_type_mapping[z['name']] = z['type']
     
     display_type_names = {
         "Entrance": "🚪 Entrance (หน้าเตา)",
@@ -581,14 +588,19 @@ if not df_pieces.empty:
         "Debinder": "♨️ Debinder Zone",
         "Cooling": "❄️ Cooling Zone",
         "Flux": "💧 Flux Zone",
-        "Xfer": "↔️ Intermediate Transfer (จุดเชื่อมต่อ)",
         "Exit": "🏁 Exit (ท้ายเตา)"
     }
     
     ordered_types = []
     for z in FURNACE_ZONE_DATA[current_nb]:
-        if z['type'] not in ordered_types:
-            ordered_types.append(z['type'])
+        t = zone_type_mapping[z['name']]
+        if t not in ordered_types:
+            ordered_types.append(t)
+            
+        # สร้างชื่อแสดงผลสำหรับ Xfer ที่แยกเฉพาะ (ถ้ายังไม่มีในดิกชันนารี)
+        if t not in display_type_names:
+            display_type_names[t] = f"↔️ {t} (จุดเชื่อมต่อ)"
+            
     ordered_display_groups = [display_type_names[t] for t in ordered_types]
     
     if not wip_summary.empty:
