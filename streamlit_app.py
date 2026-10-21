@@ -226,7 +226,6 @@ with col1:
     else:
         current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
         
-    # ตรวจสอบว่าเปิดโหมด BTM อัตโนมัติหรือไม่ (สำหรับ NB3 และในไฟล์ PAQ มีคำว่า BTM)
     is_btm_mode_default = False
     if current_nb == "NB3" and uploaded_file is not None and "BTM" in uploaded_file.name.upper():
         is_btm_mode_default = True
@@ -276,10 +275,8 @@ total_furnace_length = cumulative_len
 df_zones = pd.DataFrame(furnace_zones_df)
 all_zone_labels = df_zones["Name"].tolist()
 
-# คำนวณระยะ Offset ถ้าเป็นโหมด BTM (ข้าม Entrance และ Fluxer ไปเริ่มต้นที่ XFER)
 start_offset_m = 0.0
 if is_btm_mode and current_nb == "NB3":
-    # Entrance (0.90) + Fluxer (4.05) = 4.95
     for z in FURNACE_ZONE_DATA["NB3"]:
         if z["name"] in ["Entrance", "Fluxer"]:
             start_offset_m += z["len"]
@@ -339,7 +336,6 @@ if not df_schedule_raw.empty:
         if not df_pieces.empty:
             df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
             
-            # คำนวณเวลา Exit Time โดยหักลบระยะ Offset ออกไปจากความยาวทั้งหมด
             remaining_distance = total_furnace_length - start_offset_m
             df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(remaining_distance / df_pieces['Speed_ms'], unit='s')
             
@@ -388,11 +384,9 @@ if not df_pieces.empty:
         
     current_sim = st.session_state.current_sim_time
     
-    # คำนวณ Elapsed_s และบวกระยะ Offset ของ BTM Mode ลงใน Position
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
     df_pieces['Position'] = start_offset_m + (df_pieces['Elapsed_s'] * df_pieces['Speed_ms'])
     
-    # กรองแสดงเฉพาะชิ้นงานที่เข้าเตามาแล้ว (Position >= start_offset_m)
     df_current = df_pieces[(df_pieces['Position'] >= start_offset_m) & (df_pieces['Position'] <= total_furnace_length)].copy()
     
     color_sequence = px.colors.qualitative.Plotly
@@ -554,7 +548,7 @@ if not df_pieces.empty:
         wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model_Table', 'Box_Count', 'Multiplier', 'Quantity'])
 
     # ==============================================================================
-    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ
+    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (แสดงข้อมูล Pitch ด้วย)
     # ==============================================================================
     st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
     
@@ -581,10 +575,14 @@ if not df_pieces.empty:
         wip_summary['Process_Group_Raw'] = wip_summary['Zone'].map(zone_type_mapping)
         wip_summary['Process_Group'] = wip_summary['Process_Group_Raw'].map(display_type_names)
         
-        group_summary = wip_summary.groupby(['Process_Group', 'Display_Model_Table'], observed=False)['Quantity'].sum().reset_index()
+        # จัดกลุ่มโดยคำนวณหายอดรวม Quantity และ Box_Count (Pitches) ไปด้วยพร้อมกัน
+        group_summary = wip_summary.groupby(['Process_Group', 'Display_Model_Table'], observed=False).agg(
+            Quantity=('Quantity', 'sum'),
+            Box_Count=('Box_Count', 'sum')
+        ).reset_index()
         group_summary = group_summary[group_summary['Quantity'] > 0]
     else:
-        group_summary = pd.DataFrame(columns=['Process_Group', 'Display_Model_Table', 'Quantity'])
+        group_summary = pd.DataFrame(columns=['Process_Group', 'Display_Model_Table', 'Quantity', 'Box_Count'])
     
     if len(ordered_display_groups) > 0:
         cols = st.columns(3)
@@ -592,16 +590,20 @@ if not df_pieces.empty:
             col = cols[idx % 3]
             with col:
                 df_pg = group_summary[group_summary['Process_Group'] == p_group]
-                total = int(df_pg['Quantity'].sum()) if not df_pg.empty else 0
+                total_qty = int(df_pg['Quantity'].sum()) if not df_pg.empty else 0
+                total_pitches = int(df_pg['Box_Count'].sum()) if not df_pg.empty else 0
                 
                 with st.container(border=True):
                     st.markdown(f"**{p_group}**")
-                    st.markdown(f"### รวม: {total} ชิ้น")
-                    if total > 0:
+                    if total_qty > 0:
+                        st.markdown(f"### รวม: {total_qty} ชิ้น ({total_pitches} pitches)")
                         for _, r in df_pg.iterrows():
                             model_name_inline = r['Display_Model_Table'].replace('\n', ' ')
-                            st.caption(f"• {model_name_inline} : {int(r['Quantity'])} ชิ้น")
+                            qty = int(r['Quantity'])
+                            pitches = int(r['Box_Count'])
+                            st.caption(f"• {model_name_inline} : {qty} ชิ้น ({pitches} pitches)")
                     else:
+                        st.markdown("### รวม: 0 ชิ้น")
                         st.caption("ไม่มีชิ้นงาน")
     else:
         st.info("ไม่มีกระบวนการหลักในเตานี้")
