@@ -31,7 +31,7 @@ def identify_furnace_type(text_to_search):
     return furnace_id
 
 # ==============================================================================
-# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) และ Model Pitch
+# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) และ Model Pitch (อัปเดตตามภาพล่าสุด)
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
@@ -45,8 +45,8 @@ FURNACE_ZONE_DATA = {
         {"name": "Z#3", "len": 2.36, "type": "Heating"}, {"name": "Z#4", "len": 2.02, "type": "Heating"},
         {"name": "Z#5", "len": 2.01, "type": "Heating"}, {"name": "Z#6", "len": 1.84, "type": "Heating"},
         {"name": "Z#7", "len": 2.81, "type": "Heating"}, {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
-        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"}, {"name": "Exit curtain", "len": 2.10, "type": "Cooling"},
-        {"name": "XFER#2", "len": 0.40, "type": "Cooling"}, {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"}, {"name": "Exit curtain", "len": 2.29, "type": "Cooling"},
+        {"name": "XFER#2", "len": 0.22, "type": "Cooling"}, {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
         {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB2": [
@@ -58,8 +58,8 @@ FURNACE_ZONE_DATA = {
         {"name": "Z#3", "len": 2.36, "type": "Heating"}, {"name": "Z#4", "len": 2.02, "type": "Heating"},
         {"name": "Z#5", "len": 2.01, "type": "Heating"}, {"name": "Z#6", "len": 1.84, "type": "Heating"},
         {"name": "Z#7", "len": 2.81, "type": "Heating"}, {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
-        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"}, {"name": "Exit curtain", "len": 2.10, "type": "Cooling"},
-        {"name": "XFER#2", "len": 0.40, "type": "Cooling"}, {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "WatCool#2", "len": 1.41, "type": "Cooling"}, {"name": "Exit curtain", "len": 2.29, "type": "Cooling"},
+        {"name": "XFER#2", "len": 0.22, "type": "Cooling"}, {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
         {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB3": [
@@ -71,7 +71,7 @@ FURNACE_ZONE_DATA = {
         {"name": "Z#4", "len": 2.02, "type": "Heating"}, {"name": "Z#5", "len": 2.01, "type": "Heating"},
         {"name": "Z#6", "len": 1.84, "type": "Heating"}, {"name": "Z#7", "len": 2.81, "type": "Heating"},
         {"name": "WatCool#1", "len": 2.39, "type": "Cooling"}, {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
-        {"name": "Exit curtain", "len": 2.50, "type": "Cooling"}, {"name": "AirCool#1", "len": 1.25, "type": "Cooling"},
+        {"name": "Exit curtain", "len": 2.29, "type": "Cooling"}, {"name": "AirCool#1", "len": 0.22, "type": "Cooling"},
         {"name": "AirCool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ]
 }
@@ -96,7 +96,7 @@ ZONE_COLORS = {
 }
 
 IMAGE_MAPPING = {
-    "NB1": "Screenshot 2026-10-21 083432.png", # อัปเดตไฟล์ภาพสำหรับ NB1
+    "NB1": "Screenshot 2026-10-21 083432.png", 
     "NB2": "Screenshot 2026-10-20 144037.png",
     "NB3": "Screenshot 2026-10-20 144101.png"
 }
