@@ -34,7 +34,6 @@ def identify_furnace_type(text_to_search):
 # ==============================================================================
 def detect_furnace_from_dataframe(df):
     text_data = ""
-    # นำข้อมูลคอลัมน์ Description และ Reference มารวมกันเพื่อหา Keyword
     if 'Description' in df.columns:
         text_data += " ".join(df['Description'].dropna().astype(str).tolist())
     if 'Reference' in df.columns:
@@ -42,7 +41,6 @@ def detect_furnace_from_dataframe(df):
         
     text_data = text_data.upper()
     
-    # คำค้นหาที่เป็นเอกลักษณ์ของแต่ละเตา
     nb1_kws = ["16XHP", "27XHP", "12XHP", "CMFB", "D15B", "DNGA", "P42QR", "W42JK", "F44", "F48", "DEMIO", "5H45V", "KN9", "N117", "YR9", "SU2", "Y4L", "GC7"]
     nb2_kws = ["TAHC", "UTAHC", "CHORA"]
     nb3_kws = ["KE8", "X11C", "T34", "RBC", "K2", "J4LL", "BTM", "EVO", "CORION"]
@@ -55,7 +53,6 @@ def detect_furnace_from_dataframe(df):
         return None
         
     scores = {"NB1": nb1_score, "NB2": nb2_score, "NB3": nb3_score}
-    # คืนค่าเตาที่มีจำนวน Keyword ตรงกันมากที่สุด
     return max(scores, key=scores.get)
 
 # ==============================================================================
@@ -209,19 +206,17 @@ if uploaded_excels:
             
     if dfs:
         df_schedule_raw = pd.concat(dfs, ignore_index=True)
-        # ให้ระบบตรวจสอบเตาจากคอลัมน์ A&B โดยอัตโนมัติ
         current_nb_detected_excel = detect_furnace_from_dataframe(df_schedule_raw)
 
 st.markdown("---")
 
 # ==============================================================================
-# 7. ตั้งค่าพารามิเตอร์เตา 
+# 7. ตั้งค่าพารามิเตอร์เตา (รวมถึง BTM Mode สำหรับ NB3)
 # ==============================================================================
 st.markdown("### ⚙️ 3. ตั้งค่าพารามิเตอร์เตา")
 col1, col2 = st.columns(2)
 
 with col1:
-    # ลำดับความสำคัญในการระบุเตา: PAQ > Excel > Manual
     auto_detected_nb = current_nb_detected_paq or current_nb_detected_excel
     
     if auto_detected_nb:
@@ -230,6 +225,16 @@ with col1:
         current_nb = auto_detected_nb
     else:
         current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
+        
+    # ตรวจสอบว่าเปิดโหมด BTM อัตโนมัติหรือไม่ (สำหรับ NB3 และในไฟล์ PAQ มีคำว่า BTM)
+    is_btm_mode_default = False
+    if current_nb == "NB3" and uploaded_file is not None and "BTM" in uploaded_file.name.upper():
+        is_btm_mode_default = True
+        
+    if current_nb == "NB3":
+        is_btm_mode = st.checkbox("⚙️ โหลดชิ้นงานที่จุด XFER (BTM Mode)", value=is_btm_mode_default, help="หากติ๊กเลือกระบบจะข้ามโซน Entrance/Fluxer และเริ่มนับระยะที่ XFER")
+    else:
+        is_btm_mode = False
 
 default_speeds = {
     "NB1": 1.40,
@@ -270,6 +275,14 @@ for z in zones:
 total_furnace_length = cumulative_len
 df_zones = pd.DataFrame(furnace_zones_df)
 all_zone_labels = df_zones["Name"].tolist()
+
+# คำนวณระยะ Offset ถ้าเป็นโหมด BTM (ข้าม Entrance และ Fluxer ไปเริ่มต้นที่ XFER)
+start_offset_m = 0.0
+if is_btm_mode and current_nb == "NB3":
+    # Entrance (0.90) + Fluxer (4.05) = 4.95
+    for z in FURNACE_ZONE_DATA["NB3"]:
+        if z["name"] in ["Entrance", "Fluxer"]:
+            start_offset_m += z["len"]
 
 df_pieces = pd.DataFrame()
 
@@ -325,7 +338,11 @@ if not df_schedule_raw.empty:
         df_pieces = pd.DataFrame(pieces_list)
         if not df_pieces.empty:
             df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
-            df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(total_furnace_length / df_pieces['Speed_ms'], unit='s')
+            
+            # คำนวณเวลา Exit Time โดยหักลบระยะ Offset ออกไปจากความยาวทั้งหมด
+            remaining_distance = total_furnace_length - start_offset_m
+            df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(remaining_distance / df_pieces['Speed_ms'], unit='s')
+            
             df_pieces['Display_Model'] = df_pieces.apply(
                 lambda x: f"{x['Model']} ({x['Reference']})" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
                 axis=1
@@ -371,10 +388,12 @@ if not df_pieces.empty:
         
     current_sim = st.session_state.current_sim_time
     
+    # คำนวณ Elapsed_s และบวกระยะ Offset ของ BTM Mode ลงใน Position
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
-    df_pieces['Position'] = df_pieces['Elapsed_s'] * df_pieces['Speed_ms']
+    df_pieces['Position'] = start_offset_m + (df_pieces['Elapsed_s'] * df_pieces['Speed_ms'])
     
-    df_current = df_pieces[(df_pieces['Position'] >= 0) & (df_pieces['Position'] <= total_furnace_length)].copy()
+    # กรองแสดงเฉพาะชิ้นงานที่เข้าเตามาแล้ว (Position >= start_offset_m)
+    df_current = df_pieces[(df_pieces['Position'] >= start_offset_m) & (df_pieces['Position'] <= total_furnace_length)].copy()
     
     color_sequence = px.colors.qualitative.Plotly
     
@@ -397,7 +416,7 @@ else:
     st.info("💡 **ข้อมูลการโหลดชิ้นงานยังว่างเปล่า** อัปโหลดไฟล์ Excel ด้านบนเพื่อดูตำแหน่งจริงและเวลาที่สัมพันธ์กัน")
     
     pitch_m = 0.660
-    product_positions = np.arange(0, total_furnace_length, pitch_m)
+    product_positions = np.arange(start_offset_m, total_furnace_length, pitch_m)
     fig.add_trace(go.Scatter(
         x=product_positions, y=[1.2] * len(product_positions),
         mode="markers", name="ตัวอย่าง (Sample Data)",
@@ -509,15 +528,20 @@ if not df_pieces.empty:
         bins = [0] + df_zones["End"].tolist()
         df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=all_zone_labels, right=True)
         
-        wip_summary = df_current.groupby(['Zone', 'Display_Model'], observed=False).agg(
-            Box_Count=('Display_Model', 'size'),
+        df_current['Display_Model_Table'] = df_current.apply(
+            lambda x: f"{x['Model']}\n{x['Reference']}" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
+            axis=1
+        )
+        
+        wip_summary = df_current.groupby(['Zone', 'Display_Model_Table'], observed=False).agg(
+            Box_Count=('Display_Model_Table', 'size'),
             Multiplier=('Pieces_in_Box', 'first') 
         ).reset_index()
         
         wip_summary = wip_summary[wip_summary['Box_Count'] > 0]
         wip_summary['Quantity'] = wip_summary['Box_Count'] * wip_summary['Multiplier']
         
-        wip_pivot = wip_summary.pivot(index='Display_Model', columns='Zone', values='Quantity').fillna(0).astype(int)
+        wip_pivot = wip_summary.pivot(index='Display_Model_Table', columns='Zone', values='Quantity').fillna(0).astype(int)
         wip_pivot.index.name = 'Model (Reference)'
         
         wip_pivot = wip_pivot.reindex(columns=all_zone_labels, fill_value=0)
@@ -527,7 +551,7 @@ if not df_pieces.empty:
         empty_df = pd.DataFrame(columns=all_zone_labels)
         empty_df.index.name = 'Model (Reference)'
         st.dataframe(empty_df, use_container_width=True)
-        wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model', 'Box_Count', 'Multiplier', 'Quantity'])
+        wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model_Table', 'Box_Count', 'Multiplier', 'Quantity'])
 
     # ==============================================================================
     # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ
@@ -557,10 +581,10 @@ if not df_pieces.empty:
         wip_summary['Process_Group_Raw'] = wip_summary['Zone'].map(zone_type_mapping)
         wip_summary['Process_Group'] = wip_summary['Process_Group_Raw'].map(display_type_names)
         
-        group_summary = wip_summary.groupby(['Process_Group', 'Display_Model'], observed=False)['Quantity'].sum().reset_index()
+        group_summary = wip_summary.groupby(['Process_Group', 'Display_Model_Table'], observed=False)['Quantity'].sum().reset_index()
         group_summary = group_summary[group_summary['Quantity'] > 0]
     else:
-        group_summary = pd.DataFrame(columns=['Process_Group', 'Display_Model', 'Quantity'])
+        group_summary = pd.DataFrame(columns=['Process_Group', 'Display_Model_Table', 'Quantity'])
     
     if len(ordered_display_groups) > 0:
         cols = st.columns(3)
@@ -575,7 +599,7 @@ if not df_pieces.empty:
                     st.markdown(f"### รวม: {total} ชิ้น")
                     if total > 0:
                         for _, r in df_pg.iterrows():
-                            model_name_inline = r['Display_Model']
+                            model_name_inline = r['Display_Model_Table'].replace('\n', ' ')
                             st.caption(f"• {model_name_inline} : {int(r['Quantity'])} ชิ้น")
                     else:
                         st.caption("ไม่มีชิ้นงาน")
