@@ -89,13 +89,9 @@ IMAGE_MAPPING = {
 }
 
 # ==============================================================================
-# 3. ฐานข้อมูล Model Pitch และ Pieces per Pitch (วิเคราะห์ตามรูปที่แนบมา)
+# 3. ฐานข้อมูล Model Pitch และ Pieces per Pitch
 # ==============================================================================
 def get_model_info(description, furnace_id):
-    """
-    รับชื่อ Description และ Furnace ID 
-    เพื่อคืนค่า (Pitch เป็นเมตร, จำนวนชิ้นต่อตำแหน่ง)
-    """
     desc = str(description).upper()
     
     if furnace_id == "NB1":
@@ -196,7 +192,7 @@ with col2:
 st.markdown("---")
 
 # ==============================================================================
-# 7. ประมวลผลข้อมูลชิ้นงาน (คิวอัตโนมัติ + ฐานข้อมูล Pitch ใหม๋)
+# 7. ประมวลผลข้อมูลชิ้นงาน
 # ==============================================================================
 df_pieces = pd.DataFrame()
 
@@ -220,8 +216,13 @@ if uploaded_excels:
             df_schedule['Start Time'] = pd.to_datetime(df_schedule['Start Time'])
             df_schedule = df_schedule.sort_values('Start Time')
             
+            # พรีวิวข้อมูล
+            preview_cols = required_cols.copy()
+            if 'Reference' in df_schedule.columns:
+                preview_cols.insert(0, 'Reference')
+            
             with st.expander("ดูข้อมูลแผนการผลิต (Data Preview)"):
-                st.dataframe(df_schedule[required_cols].head(50), use_container_width=True)
+                st.dataframe(df_schedule[preview_cols].head(50), use_container_width=True)
                 
             pieces_list = []
             next_available_time = None  
@@ -230,6 +231,9 @@ if uploaded_excels:
                 qty = int(row['Quantity'])
                 start_t = row['Start Time']
                 desc = str(row['Description'])
+                
+                # ดึงค่า Reference ถ้ามี
+                ref = str(row['Reference']) if 'Reference' in df_schedule.columns else ""
                 
                 pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
                 interval_s = pitch_m / belt_speed_ms
@@ -243,6 +247,7 @@ if uploaded_excels:
                 
                 for i in range(rows_to_load):
                     pieces_list.append({
+                        'Reference': ref,
                         'Model': desc,
                         'LoadTime': current_load_time,
                         'Pitch_m': pitch_m,
@@ -305,9 +310,6 @@ if not df_pieces.empty:
     min_dt = min_time.to_pydatetime()
     max_dt = max_time.to_pydatetime()
     
-    # --------------------------------------------------------------------------
-    # Initialize unified states for slider and inputs sync
-    # --------------------------------------------------------------------------
     if 'current_sim_time' not in st.session_state or st.session_state.current_sim_time < min_dt or st.session_state.current_sim_time > max_dt:
         st.session_state.current_sim_time = min_dt
         st.session_state.date_input_val = min_dt.date()
@@ -316,7 +318,6 @@ if not df_pieces.empty:
         
     current_sim = st.session_state.current_sim_time
     
-    # คำนวณตำแหน่งจากเวลาจำลอง ณ ปัจจุบัน
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
     df_pieces['Position'] = df_pieces['Elapsed_s'] * df_pieces['Speed_ms']
     
@@ -372,20 +373,18 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# 9. Time Slider & Manual Inputs (ระบบ Two-way binding)
+# 9. Time Slider & Manual Inputs (Two-way binding)
 # ------------------------------------------------------------------------------
 if not df_pieces.empty:
     st.markdown("---")
     st.markdown("### ⏱️ ควบคุมเวลาจำลอง (Simulation Time)")
     
-    # Callback เมื่อมีการขยับ Slider
     def on_slider_change():
         new_dt = st.session_state.sim_time_slider
         st.session_state.current_sim_time = new_dt
         st.session_state.date_input_val = new_dt.date()
         st.session_state.time_input_val = new_dt.strftime("%H:%M:%S")
 
-    # Callback เมื่อมีการพิมพ์เวลา หรือเปลี่ยนวันที่เอง
     def on_input_change():
         try:
             d = st.session_state.date_input_val
@@ -393,17 +392,15 @@ if not df_pieces.empty:
             t = pd.to_datetime(t_str, format="%H:%M:%S").time()
             new_dt = datetime.combine(d, t)
             
-            # ตรวจสอบไม่ให้เวลาหลุดขอบเขต Slider
             if new_dt < min_dt: new_dt = min_dt
             if new_dt > max_dt: new_dt = max_dt
             
-            # เซ็ตค่าทั้ง Slider และ State กลางใหม่
             st.session_state.current_sim_time = new_dt
             st.session_state.sim_time_slider = new_dt
             st.session_state.date_input_val = new_dt.date()
             st.session_state.time_input_val = new_dt.strftime("%H:%M:%S")
         except ValueError:
-            pass # หากพิมพ์ format ผิด ให้ปล่อยผ่านโดยไม่พัง
+            pass 
             
     col_d, col_t = st.columns(2)
     with col_d:
@@ -422,7 +419,6 @@ if not df_pieces.empty:
             help="กรุณาป้อนเวลาในรูปแบบ ชั่วโมง:นาที:วินาที (HH:MM:SS) ตัวอย่าง: 19:32:00"
         )
     
-    # แจ้งเตือนกรณีพิมพ์ Format เวลาไม่ถูกต้อง
     try:
         pd.to_datetime(st.session_state.time_input_val, format="%H:%M:%S")
     except ValueError:
@@ -432,7 +428,7 @@ if not df_pieces.empty:
         "ลากเพื่อเลื่อนดูเวลาจำลอง (Slide to Simulator Time):", 
         min_value=min_dt, 
         max_value=max_dt, 
-        step=timedelta(seconds=1), # เลื่อนได้ละเอียดระดับวินาที
+        step=timedelta(seconds=1),
         format="YYYY-MM-DD HH:mm:ss",
         key="sim_time_slider",
         on_change=on_slider_change
@@ -444,15 +440,27 @@ if not df_pieces.empty:
         labels = df_zones["Name"].tolist()
         df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=labels, right=True)
         
-        wip_summary = df_current.groupby(['Zone', 'Model']).agg(
-            Box_Count=('Model', 'size'),
+        # ----------------------------------------------------------------------
+        # แปลง Model Name ให้รวม Reference ไว้ในบรรทัดใหม่เฉพาะในตาราง
+        # ----------------------------------------------------------------------
+        df_current['Display_Model'] = df_current.apply(
+            lambda x: f"{x['Model']}\n{x['Reference']}" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
+            axis=1
+        )
+        
+        wip_summary = df_current.groupby(['Zone', 'Display_Model'], observed=False).agg(
+            Box_Count=('Display_Model', 'size'),
             Multiplier=('Pieces_in_Box', 'first') 
         ).reset_index()
         
         wip_summary = wip_summary[wip_summary['Box_Count'] > 0]
         wip_summary['Quantity'] = wip_summary['Box_Count'] * wip_summary['Multiplier']
         
-        wip_pivot = wip_summary.pivot(index='Model', columns='Zone', values='Quantity').fillna(0).astype(int)
+        wip_pivot = wip_summary.pivot(index='Display_Model', columns='Zone', values='Quantity').fillna(0).astype(int)
+        
+        # เปลี่ยนหัวคอลัมน์ Index เพื่อความสวยงาม
+        wip_pivot.index.name = 'Model'
+        
         st.dataframe(wip_pivot, use_container_width=True)
     else:
         st.info("ไม่มีชิ้นงานอยู่ในเตา ณ เวลาที่เลือก")
