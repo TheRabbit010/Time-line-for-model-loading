@@ -34,14 +34,12 @@ def identify_furnace_type(text_to_search):
 # ==============================================================================
 def detect_furnace_from_dataframe(df):
     text_data = ""
-    # นำข้อมูล Description, Reference และ WORKCENTERLIST มารวมกันเพื่อเช็ค Keyword
     for col in ['Description', 'Reference', 'WORKCENTERLIST']:
         if col in df.columns:
             text_data += " " + " ".join(df[col].dropna().astype(str).tolist())
             
     text_data = text_data.upper()
     
-    # อัปเดต Keyword ตามฐานข้อมูลจากภาพ
     nb1_kws = ["16XHP", "27XHP", "12XHP", "CMFB", "D15B", "DNGA", "P42QR", "W42JK", "F44", "F48", "DEMIO", "5H45V", "KN9", "N117", "YR9", "SU2", "Y4L", "GC7", "RADIATOR", "CONDENSER", "APU450"]
     nb2_kws = ["TAHC", "UTAHC", "CHORA", "HEATER CORE", "TK/NX5", "APU350"]
     nb3_kws = ["KE8", "X11C", "T34", "RBC", "K2", "J4LL", "BTM", "EVO", "CORION", "EVAPORATOR", "MAIN_COOLER", "APU214"]
@@ -187,7 +185,6 @@ st.markdown("ระบบจำลองตำแหน่งชิ้นงา�
 # ==============================================================================
 st.markdown("### 📥 2. อัปโหลดแผนการผลิต (Excel)")
 
-# จัดการ Session State สำหรับรีเซ็ตกล่อง File Uploader
 if "file_uploader_key" not in st.session_state:
     st.session_state["file_uploader_key"] = str(datetime.now().timestamp())
 
@@ -197,13 +194,12 @@ with col_up1:
         "อัปโหลดไฟล์ข้อมูลแผนการผลิตของเตา (.xlsx หรือ .xls สามารถเลือกหลายไฟล์พร้อมกันได้)", 
         type=["xlsx", "xls"], 
         accept_multiple_files=True,
-        key=st.session_state["file_uploader_key"] # ผูก key กับ session_state
+        key=st.session_state["file_uploader_key"]
     )
 
 with col_up2:
-    st.write("") # เว้นบรรทัดให้ตรงกับกล่องอัปโหลด
     st.write("")
-    # ปุ่ม Reset/Clear data
+    st.write("")
     if st.button("🗑️ Reset / Clear Data", use_container_width=True):
         st.session_state["file_uploader_key"] = str(datetime.now().timestamp())
         st.rerun()
@@ -223,13 +219,12 @@ if uploaded_excels:
             
     if dfs:
         df_schedule_raw = pd.concat(dfs, ignore_index=True)
-        # นำไปวิเคราะห์หาเตาเพื่อ Set ค่าในตัวแปร current_nb_detected_excel
         current_nb_detected_excel = detect_furnace_from_dataframe(df_schedule_raw)
 
 st.markdown("---")
 
 # ==============================================================================
-# 7. ตั้งค่าพารามิเตอร์เตา (รวมถึง BTM Mode สำหรับ NB3)
+# 7. ตั้งค่าพารามิเตอร์เตา
 # ==============================================================================
 st.markdown("### ⚙️ 3. ตั้งค่าพารามิเตอร์เตา")
 col1, col2 = st.columns(2)
@@ -534,7 +529,7 @@ if not df_pieces.empty:
     )
     
     # ==============================================================================
-    # 11. ตารางรายละเอียดรายโซน
+    # 11. ตารางรายละเอียดรายโซน (อัปเดตการแสดงผลไฮไลท์ช่องที่มีชิ้นงาน)
     # ==============================================================================
     st.markdown(f"### 📋 รายละเอียดชิ้นงานรายโซน ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
     
@@ -560,7 +555,19 @@ if not df_pieces.empty:
         
         wip_pivot = wip_pivot.reindex(columns=all_zone_labels, fill_value=0)
         
-        st.dataframe(wip_pivot, use_container_width=True)
+        # ฟังก์ชันไฮไลท์เซลล์ตาราง: หากมีค่า > 0 ระบายพื้นหลังสีเทาอ่อนและปรับตัวหนา
+        def highlight_nonzero(val):
+            if isinstance(val, (int, float)) and val > 0:
+                return 'background-color: #E8E8E8; color: #000000; font-weight: bold;'
+            return ''
+            
+        # รองรับทั้ง Pandas เวอร์ชั่นใหม่ (.map) และเก่า (.applymap)
+        if hasattr(wip_pivot.style, 'map'):
+            styled_pivot = wip_pivot.style.map(highlight_nonzero)
+        else:
+            styled_pivot = wip_pivot.style.applymap(highlight_nonzero)
+            
+        st.dataframe(styled_pivot, use_container_width=True)
     else:
         empty_df = pd.DataFrame(columns=all_zone_labels)
         empty_df.index.name = 'Model (Reference)'
@@ -568,11 +575,10 @@ if not df_pieces.empty:
         wip_summary = pd.DataFrame(columns=['Zone', 'Display_Model_Table', 'Box_Count', 'Multiplier', 'Quantity'])
 
     # ==============================================================================
-    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ (แสดงกราฟแท่งและข้อมูล Pitch)
+    # 12. กล่องสรุปชิ้นงานตามกลุ่มกระบวนการ
     # ==============================================================================
     st.markdown("### 📊 สรุปจำนวนชิ้นงานตามกลุ่มกระบวนการ (Process Group Summary)")
     
-    # ปรับให้แยก Process Group ของ XFER ออกตามชื่อโซน
     zone_type_mapping = {}
     for z in FURNACE_ZONE_DATA[current_nb]:
         if "XFER" in z['name'].upper():
@@ -605,7 +611,6 @@ if not df_pieces.empty:
         wip_summary['Process_Group_Raw'] = wip_summary['Zone'].map(zone_type_mapping)
         wip_summary['Process_Group'] = wip_summary['Process_Group_Raw'].map(display_type_names)
         
-        # จัดกลุ่มโดยคำนวณหายอดรวม Quantity และ Box_Count (Pitches) ไปด้วยพร้อมกัน
         group_summary = wip_summary.groupby(['Process_Group', 'Display_Model_Table'], observed=False).agg(
             Quantity=('Quantity', 'sum'),
             Box_Count=('Box_Count', 'sum')
@@ -614,19 +619,15 @@ if not df_pieces.empty:
     else:
         group_summary = pd.DataFrame(columns=['Process_Group', 'Display_Model_Table', 'Quantity', 'Box_Count'])
     
-    # --- ส่วนสร้างกราฟแท่ง (Bar Chart) ---
     if not group_summary.empty:
-        # รวมข้อมูลสำหรับสร้างกราฟ (ไม่ต้องแยก Model)
         chart_data = group_summary.groupby('Process_Group', observed=False).agg(
             Quantity=('Quantity', 'sum'),
             Box_Count=('Box_Count', 'sum')
         ).reset_index()
         
-        # จัดเรียงลำดับตาม ordered_display_groups
         chart_data['Process_Group'] = pd.Categorical(chart_data['Process_Group'], categories=ordered_display_groups, ordered=True)
         chart_data = chart_data.sort_values('Process_Group')
         
-        # กำหนดสีแบบ Gradient ตามจำนวนชิ้นงานเพื่อให้ดูเป็นมืออาชีพ
         fig_bar = px.bar(
             chart_data, 
             x='Process_Group', 
@@ -652,17 +653,14 @@ if not df_pieces.empty:
             margin=dict(t=30, b=50, l=20, r=20),
             xaxis=dict(tickangle=-45, title_font=dict(size=14)),
             yaxis=dict(title="จำนวน (ชิ้น)", showgrid=True, gridcolor='#E5E5E5'),
-            coloraxis_showscale=False # ซ่อนแถบสีด้านขวาให้ดูคลีน
+            coloraxis_showscale=False
         )
         
-        # ปรับเพดานแกน Y ให้ตัวหนังสือบนแท่งไม่โดนตัด
         max_qty = chart_data['Quantity'].max()
         fig_bar.update_yaxes(range=[0, max_qty * 1.2])
 
         st.plotly_chart(fig_bar, use_container_width=True)
-    # -----------------------------------
 
-    # --- ส่วนแสดงกล่องการ์ดสรุปข้อมูล (Cards) ---
     if len(ordered_display_groups) > 0:
         cols = st.columns(3)
         for idx, p_group in enumerate(ordered_display_groups):
