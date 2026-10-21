@@ -32,11 +32,11 @@ def identify_furnace_type(text_to_search):
     return furnace_id
 
 # ==============================================================================
-# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) อัปเดตล่าสุด
+# 2. ฐานข้อมูลโซนของเตา (แยก Entrance กับ Xfer ออกจากกัน)
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
-        {"name": "Entrance", "len": 2.00, "type": "Xfer"}, {"name": "Fluxer", "len": 2.70, "type": "Flux"},
+        {"name": "Entrance", "len": 2.00, "type": "Entrance"}, {"name": "Fluxer", "len": 2.70, "type": "Flux"},
         {"name": "Xfer", "len": 2.18, "type": "Xfer"}, {"name": "Dryer Z#1", "len": 6.03, "type": "Dryer"},
         {"name": "Dryer Z#2", "len": 6.03, "type": "Dryer"}, {"name": "EXT Dryer", "len": 0.68, "type": "Dryer"},
         {"name": "ENT DB", "len": 0.68, "type": "Debinder"}, {"name": "DB Z#1", "len": 3.10, "type": "Debinder"},
@@ -51,7 +51,7 @@ FURNACE_ZONE_DATA = {
         {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB2": [
-        {"name": "Xfer 1", "len": 2.00, "type": "Xfer"}, {"name": "Flux spray", "len": 4.70, "type": "Flux"},
+        {"name": "Entrance", "len": 2.00, "type": "Entrance"}, {"name": "Flux spray", "len": 4.70, "type": "Flux"},
         {"name": "Xfer 2", "len": 2.50, "type": "Xfer"}, {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
         {"name": "DryOFF-Z#2", "len": 2.83, "type": "Dryer"}, {"name": "Xfer1", "len": 3.00, "type": "Xfer"},
         {"name": "Z#1", "len": 3.65, "type": "Heating"}, {"name": "Z#2", "len": 2.68, "type": "Heating"},
@@ -63,7 +63,7 @@ FURNACE_ZONE_DATA = {
         {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
     ],
     "NB3": [
-        {"name": "Entrance", "len": 0.90, "type": "Xfer"}, {"name": "Fluxer", "len": 4.05, "type": "Flux"},
+        {"name": "Entrance", "len": 0.90, "type": "Entrance"}, {"name": "Fluxer", "len": 4.05, "type": "Flux"},
         {"name": "XFER", "len": 2.52, "type": "Xfer"}, {"name": "Dryer#1", "len": 1.88, "type": "Dryer"},
         {"name": "Dryer#2", "len": 1.88, "type": "Dryer"}, {"name": "Dryer#3", "len": 1.88, "type": "Dryer"},
         {"name": "XFER#1", "len": 3.00, "type": "Xfer"}, {"name": "Z#1", "len": 3.65, "type": "Heating"},
@@ -77,7 +77,7 @@ FURNACE_ZONE_DATA = {
 }
 
 ZONE_COLORS = {
-    "Dryer": "#FFD700", "Debinder": "#FFA500", "Heating": "#FF4500",
+    "Entrance": "#D3D3D3", "Dryer": "#FFD700", "Debinder": "#FFA500", "Heating": "#FF4500",
     "Cooling": "#87CEFA", "Flux": "#9370DB", "Xfer": "#D3D3D3", "Exit": "#A9A9A9"
 }
 
@@ -290,9 +290,7 @@ if uploaded_excels:
             df_pieces = pd.DataFrame(pieces_list)
             if not df_pieces.empty:
                 df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
-                # คำนวณเวลาออกเตา
                 df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(total_furnace_length / df_pieces['Speed_ms'], unit='s')
-                # สร้างชื่อรุ่นพร้อม Reference สำหรับใช้แสดงผลให้ตรงกันทั้งหมด
                 df_pieces['Display_Model'] = df_pieces.apply(
                     lambda x: f"{x['Model']} ({x['Reference']})" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
                     axis=1
@@ -341,13 +339,11 @@ if not df_pieces.empty:
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
     df_pieces['Position'] = df_pieces['Elapsed_s'] * df_pieces['Speed_ms']
     
-    # ใช้ .copy() เพื่อป้องกัน SettingWithCopyWarning
     df_current = df_pieces[(df_pieces['Position'] >= 0) & (df_pieces['Position'] <= total_furnace_length)].copy()
     
     color_sequence = px.colors.qualitative.Plotly
     
     if not df_current.empty:
-        # Group by Display_Model (รวม Model กับ Reference แล้ว)
         for i, (display_model_name, group) in enumerate(df_current.groupby('Display_Model')):
             customdata = np.stack((
                 group['LoadTime'].dt.strftime('%H:%M:%S'),
@@ -356,7 +352,7 @@ if not df_pieces.empty:
 
             fig.add_trace(go.Scatter(
                 x=group['Position'], y=[1.2] * len(group),
-                mode="markers", name=display_model_name, # แสดงชื่อ Model (Reference) ใน Legend
+                mode="markers", name=display_model_name, 
                 marker=dict(symbol="square", size=12, color=color_sequence[i % len(color_sequence)], line=dict(width=1, color="black")),
                 hovertemplate=f"<b>{display_model_name}</b><br>ตำแหน่ง: %{{x:.2f}} ม.<br>โหลดเข้า: %{{customdata[0]}}<br>ออกเตา: %{{customdata[1]}}<extra></extra>",
                 customdata=customdata
@@ -392,9 +388,17 @@ fig.update_layout(
     title=f"Furnace Timeline: {current_nb} (Total Length: {total_furnace_length:.2f} m)",
     xaxis=dict(title="Distance (Meters)", range=[0, total_furnace_length], tickmode="linear", tick0=0, dtick=2),
     yaxis=dict(visible=False, range=y_range),
-    height=450, margin=dict(l=20, r=20, t=50, b=40),
+    height=550, # เพิ่มความสูงกราฟเผื่อกรณี Legend มีหลายบรรทัด
+    margin=dict(l=20, r=20, t=50, b=120), # เพิ่ม margin ด้านล่างเพื่อไม่ให้ Legend ทับแกน x
     template="plotly_white", hovermode="x unified",
-    showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    showlegend=True, 
+    legend=dict(
+        orientation="h", 
+        yanchor="top", 
+        y=-0.25, # ย้าย Legend ไปอยู่ด้านล่างสุดของกราฟเพื่อป้องกันการซ้อนทับ 
+        xanchor="center", 
+        x=0.5
+    )
 )
 
 st.plotly_chart(fig, use_container_width=True)
@@ -470,7 +474,6 @@ if not df_pieces.empty:
         bins = [0] + df_zones["End"].tolist()
         df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=all_zone_labels, right=True)
         
-        # ใช้ Display_Model เดียวกันกับที่แสดงในกราฟ (Model + Reference) เพื่อความสม่ำเสมอ
         wip_summary = df_current.groupby(['Zone', 'Display_Model'], observed=False).agg(
             Box_Count=('Display_Model', 'size'),
             Multiplier=('Pieces_in_Box', 'first') 
@@ -498,14 +501,16 @@ if not df_pieces.empty:
     
     zone_type_mapping = {z['name']: z['type'] for z in FURNACE_ZONE_DATA[current_nb]}
     
+    # อัปเดตชื่อกลุ่มใหม่เพื่อให้สะท้อนภาพที่ชัดเจนขึ้น
     display_type_names = {
+        "Entrance": "🚪 Entrance (หน้าเตา)",
         "Heating": "🔥 Brazing Zone (Z#1 - Z#7)",
         "Dryer": "💨 Dryer Zone",
         "Debinder": "♨️ Debinder Zone",
         "Cooling": "❄️ Cooling Zone",
         "Flux": "💧 Flux Zone",
-        "Xfer": "↔️ Transfer / Entrance",
-        "Exit": "🚪 Exit"
+        "Xfer": "↔️ Intermediate Transfer (จุดเชื่อมต่อ)",
+        "Exit": "🏁 Exit (ท้ายเตา)"
     }
     
     ordered_types = []
@@ -536,7 +541,6 @@ if not df_pieces.empty:
                     st.markdown(f"### รวม: {total} ชิ้น")
                     if total > 0:
                         for _, r in df_pg.iterrows():
-                            # แสดงชื่อรุ่นตามด้วย Reference ในบรรทัดเดียว
                             model_name_inline = r['Display_Model']
                             st.caption(f"• {model_name_inline} : {int(r['Quantity'])} ชิ้น")
                     else:
