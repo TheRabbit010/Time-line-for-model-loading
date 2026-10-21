@@ -209,6 +209,23 @@ st.markdown("---")
 # ==============================================================================
 # 7. ประมวลผลข้อมูลชิ้นงาน
 # ==============================================================================
+# คำนวณความยาวรวมเตาก่อน เพื่อนำไปใช้คำนวณเวลาออกเตา (Exit Time)
+zones = FURNACE_ZONE_DATA[current_nb]
+cumulative_len = 0
+furnace_zones_df = []
+for z in zones:
+    start = cumulative_len
+    end = cumulative_len + z["len"]
+    furnace_zones_df.append({
+        "Name": z["name"], "Type": z["type"], "Length": z["len"], 
+        "Start": start, "End": end
+    })
+    cumulative_len = end
+
+total_furnace_length = cumulative_len
+df_zones = pd.DataFrame(furnace_zones_df)
+all_zone_labels = df_zones["Name"].tolist()
+
 df_pieces = pd.DataFrame()
 
 if uploaded_excels:
@@ -274,29 +291,14 @@ if uploaded_excels:
             df_pieces = pd.DataFrame(pieces_list)
             if not df_pieces.empty:
                 df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
+                # คำนวณเวลาที่ชิ้นงานจะออกจากเตา (Exit Time)
+                df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(total_furnace_length / df_pieces['Speed_ms'], unit='s')
         else:
             st.error(f"❌ ไฟล์ Excel ต้องมีคอลัมน์ต่อไปนี้: {', '.join(required_cols)}")
 
 # ==============================================================================
 # 8. กราฟจำลอง Simulation
 # ==============================================================================
-
-zones = FURNACE_ZONE_DATA[current_nb]
-cumulative_len = 0
-furnace_zones_df = []
-for z in zones:
-    start = cumulative_len
-    end = cumulative_len + z["len"]
-    furnace_zones_df.append({
-        "Name": z["name"], "Type": z["type"], "Length": z["len"], 
-        "Start": start, "End": end
-    })
-    cumulative_len = end
-
-total_furnace_length = cumulative_len
-df_zones = pd.DataFrame(furnace_zones_df)
-all_zone_labels = df_zones["Name"].tolist() 
-
 fig = go.Figure()
 
 for idx, row in df_zones.iterrows():
@@ -341,12 +343,19 @@ if not df_pieces.empty:
     
     if not df_current.empty:
         for i, (model_name, group) in enumerate(df_current.groupby('Model')):
+            # รวบรวมข้อมูล LoadTime และ ExitTime ใส่ Customdata Array
+            customdata = np.stack((
+                group['LoadTime'].dt.strftime('%H:%M:%S'),
+                group['ExitTime'].dt.strftime('%H:%M:%S')
+            ), axis=-1)
+
             fig.add_trace(go.Scatter(
                 x=group['Position'], y=[1.2] * len(group),
                 mode="markers", name=model_name,
                 marker=dict(symbol="square", size=12, color=color_sequence[i % len(color_sequence)], line=dict(width=1, color="black")),
-                hovertemplate=f"<b>{model_name}</b><br>ตำแหน่ง: %{{x:.2f}} ม.<br>โหลดเข้า: %{{customdata}}<extra></extra>",
-                customdata=group['LoadTime'].dt.strftime('%H:%M:%S')
+                # อัปเดต Hover Template ให้แสดงเวลาออก (Exit time)
+                hovertemplate=f"<b>{model_name}</b><br>ตำแหน่ง: %{{x:.2f}} ม.<br>โหลดเข้า: %{{customdata[0]}}<br>ออกเตา: %{{customdata[1]}}<extra></extra>",
+                customdata=customdata
             ))
 
 else:
@@ -473,7 +482,6 @@ if not df_pieces.empty:
         wip_pivot = wip_summary.pivot(index='Display_Model', columns='Zone', values='Quantity').fillna(0).astype(int)
         wip_pivot.index.name = 'Model'
         
-        # บังคับให้แสดงทุกคอลัมน์โซน แม้ไม่มีงาน
         wip_pivot = wip_pivot.reindex(columns=all_zone_labels, fill_value=0)
         
         st.dataframe(wip_pivot, use_container_width=True)
