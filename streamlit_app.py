@@ -6,7 +6,8 @@ import numpy as np
 import re
 from PIL import Image
 import os
-from datetime import timedelta
+from datetime import timedelta, datetime
+import math
 
 # ==============================================================================
 # 1. ฟังก์ชันสำหรับแยกประเภทเตา (NB1, NB2, NB3) จากชื่อไฟล์
@@ -31,7 +32,7 @@ def identify_furnace_type(text_to_search):
     return furnace_id
 
 # ==============================================================================
-# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) และ Model Pitch (อัปเดตตามภาพล่าสุด)
+# 2. ฐานข้อมูลโซนของเตา (Zone Lengths) อัปเดตล่าสุด
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
@@ -76,20 +77,6 @@ FURNACE_ZONE_DATA = {
     ]
 }
 
-MODEL_DB = pd.DataFrame([
-    {"Model": "New design standard dummy SUS304L", "Pitch (mm)": 350},
-    {"Model": "Dummy SUS", "Pitch (mm)": 455},
-    {"Model": "Dummy KN9", "Pitch (mm)": 790},
-    {"Model": "KN9 #6", "Pitch (mm)": 760},
-    {"Model": "D12A", "Pitch (mm)": 790},
-    {"Model": "Y4L", "Pitch (mm)": 790},
-    {"Model": "F44", "Pitch (mm)": 660},
-    {"Model": "F48", "Pitch (mm)": 660},
-    {"Model": "P42QR", "Pitch (mm)": 760},
-    {"Model": "SU2", "Pitch (mm)": 660},
-    {"Model": "DNGA", "Pitch (mm)": 610}
-])
-
 ZONE_COLORS = {
     "Dryer": "#FFD700", "Debinder": "#FFA500", "Heating": "#FF4500",
     "Cooling": "#87CEFA", "Flux": "#9370DB", "Xfer": "#D3D3D3", "Exit": "#A9A9A9"
@@ -101,17 +88,57 @@ IMAGE_MAPPING = {
     "NB3": "Screenshot 2026-10-20 144101.png"
 }
 
-def get_pitch_for_model(description):
-    """ค้นหา Pitch จากชื่อโมเดล ถ้าไม่เจอใช้ค่า 660mm เป็นค่าปริยาย"""
-    desc_str = str(description).upper()
-    for _, row in MODEL_DB.iterrows():
-        kw = str(row['Model']).upper()
-        if kw in desc_str:
-            return row['Pitch (mm)'] / 1000.0
-    return 0.660 # Default
+# ==============================================================================
+# 3. ฐานข้อมูล Model Pitch และ Pieces per Pitch (วิเคราะห์ตามรูปที่แนบมา)
+# ==============================================================================
+def get_model_info(description, furnace_id):
+    """
+    รับชื่อ Description และ Furnace ID 
+    เพื่อคืนค่า (Pitch เป็นเมตร, จำนวนชิ้นต่อตำแหน่ง)
+    """
+    desc = str(description).upper()
+    
+    if furnace_id == "NB1":
+        if "KN9 #6" in desc: return 760 / 1000.0, 1
+        if "KN9" in desc: return 790 / 1000.0, 2
+        if "D12A" in desc: return 790 / 1000.0, 2
+        if "Y4L" in desc: return 790 / 1000.0, 2
+        if "T36" in desc: return 790 / 1000.0, 2
+        if "N117" in desc: return 790 / 1000.0, 2
+        if "YR9" in desc: return 790 / 1000.0, 2
+        if "F44" in desc or "F48" in desc: return 660 / 1000.0, 2
+        if "DEMIO DE" in desc: return 565 / 1000.0, 2
+        if "DEMIO CE" in desc: return 590 / 1000.0, 2
+        if "CMFB" in desc: return 640 / 1000.0, 2
+        if "P42QRMY25" in desc: return 765 / 1000.0, 2
+        if "P42QR" in desc or "W42JK" in desc: return 760 / 1000.0, 2
+        if "SU2" in desc and "RAD" not in desc: return 660 / 1000.0, 2
+        if "DNGA" in desc or "D15B" in desc: return 610 / 1000.0, 2
+        if "5H45V" in desc: return 670 / 1000.0, 2
+        if "RAD 12XHP SU2" in desc: return 580 / 1000.0, 2
+        if "RAD16XHP" in desc: return 1041 / 1000.0, 2
+        if "RAD27XHP" in desc: return 887 / 1000.0, 2
+        if "RAD P13C" in desc: return 518 / 1000.0, 2
+        return 660 / 1000.0, 2 
+
+    elif furnace_id == "NB2":
+        if "DUMMY" in desc: return 355 / 1000.0, 4
+        if "P13C" in desc: return 370 / 1000.0, 4
+        return 380 / 1000.0, 4
+
+    elif furnace_id == "NB3":
+        if "KE8" in desc: return 370 / 1000.0, 3
+        if any(kw in desc for kw in ["X11C", "T34", "D12A", "RBC", "K2"]): return 383 / 1000.0, 3
+        if "J4LL" in desc: return 383 / 1000.0, 2 
+        if "BTM N175" in desc: return 1280 / 1000.0, 2
+        if "BTM N173" in desc: return 1400 / 1000.0, 2
+        if "BTM M48" in desc: return 1435 / 1000.0, 1
+        return 463 / 1000.0, 3
+        
+    return 660 / 1000.0, 2
 
 # ==============================================================================
-# 3. ส่วนของหน้าจอ Streamlit (UI)
+# 4. ส่วนของหน้าจอ Streamlit (UI)
 # ==============================================================================
 st.set_page_config(page_title="Furnace Product Simulation", page_icon="🔥", layout="wide")
 
@@ -134,7 +161,7 @@ st.title("🔥 Furnace Product & Simulation")
 st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) โดยอ้างอิงจากแผนการโหลดชิ้นงานจริง")
 
 # ==============================================================================
-# 4. อัปโหลดและประมวลผลข้อมูล Excel
+# 5. อัปโหลดและประมวลผลข้อมูล Excel
 # ==============================================================================
 st.markdown("### 📥 2. อัปโหลดแผนการผลิต (Excel)")
 uploaded_excels = st.file_uploader(
@@ -149,10 +176,10 @@ if uploaded_excels:
 st.markdown("---")
 
 # ==============================================================================
-# 5. ตั้งค่าพารามิเตอร์เตา 
+# 6. ตั้งค่าพารามิเตอร์เตา 
 # ==============================================================================
 st.markdown("### ⚙️ 3. ตั้งค่าพารามิเตอร์เตา")
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 
 with col1:
     if current_nb_detected:
@@ -163,15 +190,13 @@ with col1:
 
 with col2:
     belt_speed_m_min = st.number_input("ความเร็วสายพาน (เมตร/นาที)", min_value=0.1, max_value=5.0, value=1.40, step=0.10, format="%.2f")
-    belt_speed_ms = belt_speed_m_min / 60.0  # แปลงเป็น เมตร/วินาที
-
-with col3:
-    pieces_per_row = st.number_input("จำนวนชิ้นงานต่อแถว/กล่อง (Pieces/Row)", min_value=1, max_value=10, value=2, step=1)
+    belt_speed_ms = belt_speed_m_min / 60.0  
+    st.caption("ℹ️ *ระยะห่าง (Pitch) และการจัดเรียงถูกคำนวณอัตโนมัติจากฐานข้อมูลตามรุ่น*")
 
 st.markdown("---")
 
 # ==============================================================================
-# 6. ประมวลผลข้อมูลชิ้นงาน (เพิ่มระบบ Queue ป้องกันการซ้อนทับ)
+# 7. ประมวลผลข้อมูลชิ้นงาน (คิวอัตโนมัติ + ฐานข้อมูล Pitch ใหม๋)
 # ==============================================================================
 df_pieces = pd.DataFrame()
 
@@ -192,7 +217,6 @@ if uploaded_excels:
             df_schedule = df_schedule.dropna(subset=['Start Time', 'Quantity'])
             df_schedule = df_schedule[df_schedule['Quantity'] > 0]
             
-            # เรียงข้อมูลตามเวลาเพื่อให้คิวการโหลดทำงานได้ถูกต้อง (ใครมาก่อนโหลดก่อน)
             df_schedule['Start Time'] = pd.to_datetime(df_schedule['Start Time'])
             df_schedule = df_schedule.sort_values('Start Time')
             
@@ -200,20 +224,18 @@ if uploaded_excels:
                 st.dataframe(df_schedule[required_cols].head(50), use_container_width=True)
                 
             pieces_list = []
-            next_available_time = None  # ตัวแปรจำเวลาที่สายพานจะว่าง (แก้ภาพซ้อน)
+            next_available_time = None  
             
             for _, row in df_schedule.iterrows():
                 qty = int(row['Quantity'])
                 start_t = row['Start Time']
                 desc = str(row['Description'])
                 
-                pitch_m = get_pitch_for_model(desc)
+                pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
                 interval_s = pitch_m / belt_speed_ms
                 
-                # หารจำนวนชิ้นด้วย "จำนวนชิ้นต่อแถว" 
-                rows_to_load = int(np.ceil(qty / pieces_per_row))
+                rows_to_load = int(math.ceil(qty / pieces_per_pitch))
                 
-                # ถ้ารุ่นนี้ Start Time มาก่อนที่สายพานจะว่าง ให้รอจนกว่าสายพานจะว่าง
                 if next_available_time is None or start_t > next_available_time:
                     current_load_time = start_t
                 else:
@@ -224,12 +246,11 @@ if uploaded_excels:
                         'Model': desc,
                         'LoadTime': current_load_time,
                         'Pitch_m': pitch_m,
-                        'Speed_ms': belt_speed_ms
+                        'Speed_ms': belt_speed_ms,
+                        'Pieces_in_Box': pieces_per_pitch
                     })
-                    # ขยับเวลาโหลดกล่องถัดไป ตามระยเวลาที่ต้องใช้ (Interval)
                     current_load_time += pd.Timedelta(seconds=interval_s)
                 
-                # อัปเดตเวลาว่างของสายพานสำหรับออเดอร์ถัดไป
                 next_available_time = current_load_time
             
             df_pieces = pd.DataFrame(pieces_list)
@@ -239,7 +260,7 @@ if uploaded_excels:
             st.error(f"❌ ไฟล์ Excel ต้องมีคอลัมน์ต่อไปนี้: {', '.join(required_cols)}")
 
 # ==============================================================================
-# 7. กราฟจำลอง Simulation
+# 8. กราฟจำลอง Simulation
 # ==============================================================================
 
 zones = FURNACE_ZONE_DATA[current_nb]
@@ -306,15 +327,12 @@ if not df_pieces.empty:
 
 else:
     st.info("💡 **ข้อมูลการโหลดชิ้นงานยังว่างเปล่า** อัปโหลดไฟล์ Excel ด้านบนเพื่อดูตำแหน่งจริงและเวลาที่สัมพันธ์กัน")
-    selected_model = st.selectbox("เลือกโมเดลเพื่อดูตัวอย่าง (Sample Model):", MODEL_DB["Model"].tolist())
     
-    pitch_mm = MODEL_DB.loc[MODEL_DB["Model"] == selected_model, "Pitch (mm)"].values[0]
-    pitch_m = pitch_mm / 1000.0
-    
+    pitch_m = 0.660
     product_positions = np.arange(0, total_furnace_length, pitch_m)
     fig.add_trace(go.Scatter(
         x=product_positions, y=[1.2] * len(product_positions),
-        mode="markers", name=f"ตัวอย่าง {selected_model}",
+        mode="markers", name="ตัวอย่าง (Sample Data)",
         marker=dict(symbol="square", size=12, color="#32CD32", line=dict(width=2, color="black")),
         hovertemplate="ตำแหน่ง: %{x:.2f} เมตร<extra></extra>"
     ))
@@ -345,33 +363,81 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# 8. Time Slider
+# 9. Time Slider & Manual Inputs
 # ------------------------------------------------------------------------------
 if not df_pieces.empty:
     st.markdown("---")
+    st.markdown("### ⏱️ ควบคุมเวลาจำลอง (Simulation Time)")
     
+    # ฟังก์ชันอัปเดตเวลาจากการลาก Slider
     def update_sim_time():
         st.session_state.sim_time_state = st.session_state.sim_time_slider
         
+    # ฟังก์ชันอัปเดตเวลาจากการพิมพ์ช่อง Date/Time
+    def update_from_text():
+        try:
+            input_d = st.session_state.date_input_val
+            input_t_str = st.session_state.time_input_val
+            input_t = pd.to_datetime(input_t_str, format="%H:%M:%S").time()
+            new_dt = datetime.combine(input_d, input_t)
+            
+            # บล็อกไม่ให้เกินขอบเขตเวลาต่ำสุด-สูงสุด
+            if new_dt < min_time.to_pydatetime(): new_dt = min_time.to_pydatetime()
+            if new_dt > max_time.to_pydatetime(): new_dt = max_time.to_pydatetime()
+            
+            st.session_state.sim_time_state = new_dt
+        except ValueError:
+            pass # หากผู้ใช้กำลังพิมพ์แล้วผิด format จะปล่อยผ่านไปก่อน
+            
+    col_d, col_t = st.columns(2)
+    with col_d:
+        st.date_input(
+            "📅 เลือกวันที่ (Date)", 
+            value=st.session_state.sim_time_state.date(),
+            min_value=min_time.date(),
+            max_value=max_time.date(),
+            key="date_input_val",
+            on_change=update_from_text
+        )
+    with col_t:
+        st.text_input(
+            "⏰ ป้อนเวลา (Time) เช่น 19:32:00", 
+            value=st.session_state.sim_time_state.strftime("%H:%M:%S"),
+            key="time_input_val",
+            on_change=update_from_text,
+            help="กรุณาป้อนเวลาในรูปแบบ ชั่วโมง:นาที:วินาที (HH:MM:SS) ตัวอย่างการกรอกที่ถูกต้อง: 19:32:00"
+        )
+    
+    # แจ้งเตือนกรณีพิมพ์ Format เวลาไม่ถูกต้อง
+    try:
+        pd.to_datetime(st.session_state.time_input_val, format="%H:%M:%S")
+    except ValueError:
+        st.error("⚠️ รูปแบบเวลาไม่ถูกต้อง! กรุณาป้อนเวลาในรูปแบบ HH:MM:SS (ตัวอย่างที่ถูกต้อง: 19:32:00)")
+
     sim_time = st.slider(
-        "⏱️ ลากเพื่อเลื่อนดูเวลาจำลอง (Slide to Simulator Time):", 
+        "ลากเพื่อเลื่อนดูเวลาจำลอง (Slide to Simulator Time):", 
         min_value=min_time.to_pydatetime(), 
         max_value=max_time.to_pydatetime(), 
         value=st.session_state.sim_time_state, 
-        step=timedelta(minutes=1),
-        format="YYYY-MM-DD HH:mm",
+        step=timedelta(seconds=1),  # ปรับความละเอียดให้เลื่อนระดับวินาทีได้
+        format="YYYY-MM-DD HH:mm:ss",
         key="sim_time_slider",
         on_change=update_sim_time
     )
     
-    st.markdown(f"### 📋 สรุปจำนวนชิ้นงานในเตา ณ เวลา **{st.session_state.sim_time_state.strftime('%Y-%m-%d %H:%M')}**")
+    st.markdown(f"### 📋 สรุปจำนวนชิ้นงานในเตา ณ เวลา **{st.session_state.sim_time_state.strftime('%Y-%m-%d %H:%M:%S')}**")
     if not df_current.empty:
         bins = [0] + df_zones["End"].tolist()
         labels = df_zones["Name"].tolist()
         df_current['Zone'] = pd.cut(df_current['Position'], bins=bins, labels=labels, right=True)
         
-        wip_summary = df_current.groupby(['Zone', 'Model']).size().reset_index(name='Quantity')
-        wip_summary = wip_summary[wip_summary['Quantity'] > 0]
+        wip_summary = df_current.groupby(['Zone', 'Model']).agg(
+            Box_Count=('Model', 'size'),
+            Multiplier=('Pieces_in_Box', 'first') 
+        ).reset_index()
+        
+        wip_summary = wip_summary[wip_summary['Box_Count'] > 0]
+        wip_summary['Quantity'] = wip_summary['Box_Count'] * wip_summary['Multiplier']
         
         wip_pivot = wip_summary.pivot(index='Model', columns='Zone', values='Quantity').fillna(0).astype(int)
         st.dataframe(wip_pivot, use_container_width=True)
