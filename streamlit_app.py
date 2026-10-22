@@ -111,48 +111,51 @@ IMAGE_MAPPING = {
 }
 
 # ==============================================================================
-# 4. ฐานข้อมูล Model Pitch และ Pieces per Pitch
+# 4. ฐานข้อมูล Model Pitch และ Pieces per Pitch (อัปเดตจากไฟล์ Product Catalog)
 # ==============================================================================
 def get_model_info(description, furnace_id):
     desc = str(description).upper()
     
     if furnace_id == "NB1":
-        if "16XHP" in desc: return 1.041, 2
-        if "27XHP" in desc: return 0.887, 2
-        if "12XHP" in desc and "SU2" in desc: return 0.580, 2
+        # -- Radiator Specific --
+        if "16XHP" in desc and "123T" in desc: return 1.041, 2
+        if "27XHP" in desc and any(kw in desc for kw in ["64T", "73T", "123T"]): return 0.887, 2
+        if "12XHP" in desc and "SU2" in desc: return 0.660, 2
+        
+        # -- Condenser Specific --
         if "CMFB" in desc: return 0.640, 2
-        if "D15B" in desc or "DNGA" in desc: return 0.610, 2
-        if "Y4L" in desc: return 0.790, 2
+        if "D15B" in desc: return 0.610, 2
+        if "DNGA" in desc and not any(kw in desc for kw in ["DNGA1", "DNGA2"]): return 0.610, 2
         if "SU2" in desc: return 0.660, 2
-        if "P42QRMY25" in desc: return 0.765, 2
-        if "P42QR" in desc or "W42JK" in desc: return 0.760, 2
+        if "42QR" in desc or "P42QR" in desc or "W42JK" in desc: return 0.760, 2
         if "F44" in desc or "F48" in desc: return 0.660, 2
-        if "DEMIO" in desc and "DE" in desc: return 0.565, 2
-        if "DEMIO" in desc and "CE" in desc: return 0.590, 2
         if "5H45V" in desc: return 0.670, 2
-        if "KN9 #6" in desc: return 0.760, 1
-        if "KN9" in desc: return 0.790, 2
-        if "D12A" in desc: return 0.790, 2
-        if "T36" in desc: return 0.790, 2
-        if "N117" in desc: return 0.790, 2
-        if "YR9" in desc: return 0.790, 2
-        if "P13C" in desc and "RAD" in desc: return 0.518, 2
-        return 0.660, 2 
+        if "KN6 #6" in desc or "KN9 #6" in desc: return 0.760, 1
+        
+        # Default สำหรับ NB1 ตาม Catalog ส่วนใหญ่อยู่ที่ 790 mm (0.790 m) / 2 cores
+        return 0.790, 2 
 
     elif furnace_id == "NB2":
-        if "DUMMY" in desc and ("TAHC" in desc or "UTAHC" in desc): return 0.355, 4
-        if "P13C" in desc and "UTAHC" in desc: return 0.370, 4
-        if "TAHC" in desc or "UTAHC" in desc or "CHORA" in desc: return 0.380, 4
+        # -- Heater Core (TAHC/UTAHC) Specific --
+        if "P13C" in desc: return 0.370, 4
+        if "SFTP" in desc or "KAMAZ" in desc: return 0.380, 3
+        
+        # Default สำหรับ NB2 (TAHC/UTAHC/CHORA ส่วนใหญ่) อยู่ที่ 380 mm (0.380 m) / 4 cores
         return 0.380, 4
 
     elif furnace_id == "NB3":
+        # -- BTM (Battery Thermal Management) --
+        if "N173" in desc or "KEI EV" in desc: return 1.400, 4
+        if "N175" in desc or "OUTLANDER" in desc: return 1.260, 4
+        if "M48" in desc: return 1.435, 2
+        
+        # -- Evaporator & Corion --
         if "KE8" in desc: return 0.370, 3
-        if any(kw in desc for kw in ["X11C", "T34", "RBC", "K2"]): return 0.383, 3
-        if "J4LL" in desc: return 0.383, 2 
-        if "BTM N175" in desc: return 1.280, 2
-        if "BTM N173" in desc: return 1.400, 2
-        if "BTM M48" in desc: return 1.435, 1
-        if "EVO" in desc or "CORION" in desc: return 0.463, 3
+        if any(kw in desc for kw in ["NX5", "J4LL", "J2LL", "D2LL"]): return 0.363, 2
+        if "RBC" in desc or "D12A" in desc: return 0.363, 3
+        if "U825" in desc or "EMK" in desc: return 0.513, 3
+        
+        # Default สำหรับ NB3 (EVO/Corion/Evaporator/BTM Plate ส่วนใหญ่) อยู่ที่ 463 mm (0.463 m) / 3 cores
         return 0.463, 3
         
     return 0.660, 2
@@ -436,7 +439,7 @@ else:
 img_file_sim = IMAGE_MAPPING.get(current_nb)
 y_range = [-0.2, 1.8] 
 
-if os.path.exists(img_file_sim):
+if img_file_sim and os.path.exists(img_file_sim):
     img = Image.open(img_file_sim)
     fig.add_layout_image(
         dict(
