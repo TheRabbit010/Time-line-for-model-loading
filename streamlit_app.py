@@ -532,7 +532,7 @@ if not df_pieces.empty:
     )
     
     # ==============================================================================
-    # 11. ตารางรายละเอียดรายโซน (อัปเดตการแสดงผลไฮไลท์ช่องที่มีชิ้นงาน)
+    # 11. ตารางรายละเอียดรายโซน (อัปเดตการแสดงผลไฮไลท์ช่องที่มีชิ้นงาน และเพิ่มผลรวม)
     # ==============================================================================
     st.markdown(f"### 📋 รายละเอียดชิ้นงานรายโซน ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
     
@@ -558,17 +558,36 @@ if not df_pieces.empty:
         
         wip_pivot = wip_pivot.reindex(columns=all_zone_labels, fill_value=0)
         
-        # ฟังก์ชันไฮไลท์เซลล์ตาราง: หากมีค่า > 0 ระบายพื้นหลังสีเทาอ่อนและปรับตัวหนา
+        # --- ส่วนที่เพิ่มใหม่: คำนวณผลรวมรายโซน และผลรวมทั้งหมด ---
+        wip_pivot.loc['Total (รวม)'] = wip_pivot.sum(numeric_only=True)
+        grand_total = int(wip_pivot.loc['Total (รวม)'].sum())
+        
+        st.success(f"📌 **มีชิ้นงานในกระบวนการเตาทั้งหมด ณ เวลานี้: {grand_total:,} ชิ้น**")
+        # --------------------------------------------------------
+
+        # ฟังก์ชันไฮไลท์เซลล์ตารางทั่วไป: ระบายพื้นหลังสีเทาอ่อนและปรับตัวหนา
         def highlight_nonzero(val):
             if isinstance(val, (int, float)) and val > 0:
                 return 'background-color: #E8E8E8; color: #000000; font-weight: bold;'
             return ''
             
+        # ฟังก์ชันไฮไลท์บรรทัดผลรวม (Total): ให้สีแตกต่างให้เห็นชัดเจน
+        def highlight_total_row(row):
+            if row.name == 'Total (รวม)':
+                return ['background-color: #FFF2CC; font-weight: bold; color: #000000'] * len(row)
+            return [''] * len(row)
+            
         # รองรับทั้ง Pandas เวอร์ชั่นใหม่ (.map) และเก่า (.applymap)
         if hasattr(wip_pivot.style, 'map'):
-            styled_pivot = wip_pivot.style.map(highlight_nonzero)
+            styled_pivot = (wip_pivot.style
+                            .map(highlight_nonzero)
+                            .apply(highlight_total_row, axis=1)
+                            .format(precision=0))
         else:
-            styled_pivot = wip_pivot.style.applymap(highlight_nonzero)
+            styled_pivot = (wip_pivot.style
+                            .applymap(highlight_nonzero)
+                            .apply(highlight_total_row, axis=1)
+                            .format(precision=0))
             
         st.dataframe(styled_pivot, use_container_width=True)
     else:
