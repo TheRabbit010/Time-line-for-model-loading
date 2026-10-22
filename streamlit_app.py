@@ -117,12 +117,9 @@ def get_model_info(description, furnace_id):
     desc = str(description).upper()
     
     if furnace_id == "NB1":
-        # -- Radiator Specific --
         if "16XHP" in desc and "123T" in desc: return 1.041, 2
         if "27XHP" in desc and any(kw in desc for kw in ["64T", "73T", "123T"]): return 0.887, 2
         if "12XHP" in desc and "SU2" in desc: return 0.660, 2
-        
-        # -- Condenser Specific --
         if "CMFB" in desc: return 0.640, 2
         if "D15B" in desc: return 0.610, 2
         if "DNGA" in desc and not any(kw in desc for kw in ["DNGA1", "DNGA2"]): return 0.610, 2
@@ -131,31 +128,21 @@ def get_model_info(description, furnace_id):
         if "F44" in desc or "F48" in desc: return 0.660, 2
         if "5H45V" in desc: return 0.670, 2
         if "KN6 #6" in desc or "KN9 #6" in desc: return 0.760, 1
-        
-        # Default สำหรับ NB1 ตาม Catalog ส่วนใหญ่อยู่ที่ 790 mm (0.790 m) / 2 cores
         return 0.790, 2 
 
     elif furnace_id == "NB2":
-        # -- Heater Core (TAHC/UTAHC) Specific --
         if "P13C" in desc: return 0.370, 4
         if "SFTP" in desc or "KAMAZ" in desc: return 0.380, 3
-        
-        # Default สำหรับ NB2 (TAHC/UTAHC/CHORA ส่วนใหญ่) อยู่ที่ 380 mm (0.380 m) / 4 cores
         return 0.380, 4
 
     elif furnace_id == "NB3":
-        # -- BTM (Battery Thermal Management) --
         if "N173" in desc or "KEI EV" in desc: return 1.400, 4
         if "N175" in desc or "OUTLANDER" in desc: return 1.260, 4
         if "M48" in desc: return 1.435, 2
-        
-        # -- Evaporator & Corion --
         if "KE8" in desc: return 0.370, 3
         if any(kw in desc for kw in ["NX5", "J4LL", "J2LL", "D2LL"]): return 0.363, 2
         if "RBC" in desc or "D12A" in desc: return 0.363, 3
         if "U825" in desc or "EMK" in desc: return 0.513, 3
-        
-        # Default สำหรับ NB3 (EVO/Corion/Evaporator/BTM Plate ส่วนใหญ่) อยู่ที่ 463 mm (0.463 m) / 3 cores
         return 0.463, 3
         
     return 0.660, 2
@@ -241,15 +228,6 @@ with col1:
         current_nb = auto_detected_nb
     else:
         current_nb = st.selectbox("🔥 เลือกเตา (Manual):", ["NB1", "NB2", "NB3"], index=2)
-        
-    is_btm_mode_default = False
-    if current_nb == "NB3" and uploaded_file is not None and "BTM" in uploaded_file.name.upper():
-        is_btm_mode_default = True
-        
-    if current_nb == "NB3":
-        is_btm_mode = st.checkbox("⚙️ โหลดชิ้นงานที่จุด XFER (BTM Mode)", value=is_btm_mode_default, help="หากติ๊กเลือกระบบจะข้ามโซน Entrance/Fluxer และเริ่มนับระยะที่ XFER")
-    else:
-        is_btm_mode = False
 
 default_speeds = {
     "NB1": 1.40,
@@ -291,12 +269,6 @@ total_furnace_length = cumulative_len
 df_zones = pd.DataFrame(furnace_zones_df)
 all_zone_labels = df_zones["Name"].tolist()
 
-start_offset_m = 0.0
-if is_btm_mode and current_nb == "NB3":
-    for z in FURNACE_ZONE_DATA["NB3"]:
-        if z["name"] in ["Entrance", "Fluxer"]:
-            start_offset_m += z["len"]
-
 df_pieces = pd.DataFrame()
 
 if not df_schedule_raw.empty:
@@ -323,11 +295,23 @@ if not df_schedule_raw.empty:
         for _, row in df_schedule.iterrows():
             qty = int(row['Quantity'])
             start_t = row['Start Time']
-            desc = str(row['Description'])
+            desc_upper = str(row['Description']).upper()
             
             ref = str(row['Reference']) if 'Reference' in df_schedule.columns else ""
             
-            pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
+            # --- คำนวณจุดเริ่มต้นรายโมเดลอัตโนมัติ (Per-Model Start Offset) ---
+            model_start_offset = 0.0
+            if current_nb == "NB3":
+                # เช็ครุ่นที่ให้เริ่มจาก XFER (ข้าม Entrance และ Fluxer)
+                if any(kw in desc_upper for kw in ["BTM", "CORION", "A669223C"]):
+                    for z in FURNACE_ZONE_DATA["NB3"]:
+                        if z["name"] in ["Entrance", "Fluxer"]:
+                            model_start_offset += z["len"]
+                    # เพิ่มระยะเล็กน้อย 0.001 ม. เพื่อให้ตกลงในโซน XFER แน่นอนตอนคำนวณตาราง
+                    model_start_offset += 0.001 
+            # -----------------------------------------------------------
+
+            pitch_m, pieces_per_pitch = get_model_info(desc_upper, current_nb)
             interval_s = pitch_m / belt_speed_ms
             
             rows_to_load = int(math.ceil(qty / pieces_per_pitch))
@@ -340,11 +324,12 @@ if not df_schedule_raw.empty:
             for i in range(rows_to_load):
                 pieces_list.append({
                     'Reference': ref,
-                    'Model': desc,
+                    'Model': str(row['Description']),
                     'LoadTime': current_load_time,
                     'Pitch_m': pitch_m,
                     'Speed_ms': belt_speed_ms,
-                    'Pieces_in_Box': pieces_per_pitch
+                    'Pieces_in_Box': pieces_per_pitch,
+                    'Start_Offset_m': model_start_offset
                 })
                 current_load_time += pd.Timedelta(seconds=interval_s)
             
@@ -354,8 +339,8 @@ if not df_schedule_raw.empty:
         if not df_pieces.empty:
             df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
             
-            remaining_distance = total_furnace_length - start_offset_m
-            df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(remaining_distance / df_pieces['Speed_ms'], unit='s')
+            df_pieces['Remaining_Dist'] = total_furnace_length - df_pieces['Start_Offset_m']
+            df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(df_pieces['Remaining_Dist'] / df_pieces['Speed_ms'], unit='s')
             
             df_pieces['Display_Model'] = df_pieces.apply(
                 lambda x: f"{x['Model']} ({x['Reference']})" if pd.notna(x.get('Reference')) and str(x.get('Reference')).strip() not in ["", "nan"] else x['Model'],
@@ -403,9 +388,11 @@ if not df_pieces.empty:
     current_sim = st.session_state.current_sim_time
     
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
-    df_pieces['Position'] = start_offset_m + (df_pieces['Elapsed_s'] * df_pieces['Speed_ms'])
     
-    df_current = df_pieces[(df_pieces['Position'] >= start_offset_m) & (df_pieces['Position'] <= total_furnace_length)].copy()
+    # อิงตำแหน่งตาม Start Offset ของแต่ละชิ้น (บางตัวเริ่ม 0, บางตัวเริ่มที่ XFER)
+    df_pieces['Position'] = df_pieces['Start_Offset_m'] + (df_pieces['Elapsed_s'] * df_pieces['Speed_ms'])
+    
+    df_current = df_pieces[(df_pieces['Position'] >= df_pieces['Start_Offset_m']) & (df_pieces['Position'] <= total_furnace_length)].copy()
     
     color_sequence = px.colors.qualitative.Plotly
     
@@ -428,7 +415,7 @@ else:
     st.info("💡 **ข้อมูลการโหลดชิ้นงานยังว่างเปล่า** อัปโหลดไฟล์ Excel ด้านบนเพื่อดูตำแหน่งจริงและเวลาที่สัมพันธ์กัน")
     
     pitch_m = 0.660
-    product_positions = np.arange(start_offset_m, total_furnace_length, pitch_m)
+    product_positions = np.arange(0.0, total_furnace_length, pitch_m)
     fig.add_trace(go.Scatter(
         x=product_positions, y=[1.2] * len(product_positions),
         mode="markers", name="ตัวอย่าง (Sample Data)",
@@ -558,26 +545,22 @@ if not df_pieces.empty:
         
         wip_pivot = wip_pivot.reindex(columns=all_zone_labels, fill_value=0)
         
-        # --- ส่วนที่เพิ่มใหม่: คำนวณผลรวมรายโซน และผลรวมทั้งหมด ---
+        # คำนวณผลรวมรายโซน และผลรวมทั้งหมด
         wip_pivot.loc['Total (รวม)'] = wip_pivot.sum(numeric_only=True)
         grand_total = int(wip_pivot.loc['Total (รวม)'].sum())
         
         st.success(f"📌 **มีชิ้นงานในกระบวนการเตาทั้งหมด ณ เวลานี้: {grand_total:,} ชิ้น**")
-        # --------------------------------------------------------
 
-        # ฟังก์ชันไฮไลท์เซลล์ตารางทั่วไป: ระบายพื้นหลังสีเทาอ่อนและปรับตัวหนา
         def highlight_nonzero(val):
             if isinstance(val, (int, float)) and val > 0:
                 return 'background-color: #E8E8E8; color: #000000; font-weight: bold;'
             return ''
             
-        # ฟังก์ชันไฮไลท์บรรทัดผลรวม (Total): ให้สีแตกต่างให้เห็นชัดเจน
         def highlight_total_row(row):
             if row.name == 'Total (รวม)':
                 return ['background-color: #FFF2CC; font-weight: bold; color: #000000'] * len(row)
             return [''] * len(row)
             
-        # รองรับทั้ง Pandas เวอร์ชั่นใหม่ (.map) และเก่า (.applymap)
         if hasattr(wip_pivot.style, 'map'):
             styled_pivot = (wip_pivot.style
                             .map(highlight_nonzero)
