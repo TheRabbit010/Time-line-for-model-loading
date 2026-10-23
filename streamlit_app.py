@@ -55,7 +55,7 @@ def detect_furnace_from_dataframe(df):
     return max(scores, key=scores.get)
 
 # ==============================================================================
-# 3. ฐานข้อมูลโซนของเตา (Zone Lengths) อัปเดตล่าสุด
+# 3. ฐานข้อมูลโซนของเตา (Zone Lengths)
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
@@ -111,57 +111,52 @@ IMAGE_MAPPING = {
 }
 
 # ==============================================================================
-# 4. ฐานข้อมูล Model Pitch และ Pieces per Pitch (อัปเดตจากไฟล์ Product Catalog)
+# 4. ฐานข้อมูล Model Pitch และ Pieces per Pitch (ปรับให้อ่านทั้ง Desc และ Ref)
 # ==============================================================================
-def get_model_info(description, furnace_id):
-    desc = str(description).upper()
+def get_model_info(description, reference, furnace_id):
+    # นำ Description และ Reference มาต่อกันเพื่อใช้ตรวจสอบเงื่อนไขทั้งหมด
+    text_to_check = f"{description} {reference}".upper()
     
     if furnace_id == "NB1":
-        # -- Radiator Specific --
-        if "16XHP" in desc and "123T" in desc: return 1.041, 2
-        if "27XHP" in desc and any(kw in desc for kw in ["64T", "73T", "123T"]): return 0.887, 2
-        if "12XHP" in desc and "SU2" in desc: return 0.660, 2
-        
-        # -- Condenser Specific --
-        if "CMFB" in desc: return 0.640, 2
-        if "D15B" in desc: return 0.610, 2
-        if "DNGA" in desc and not any(kw in desc for kw in ["DNGA1", "DNGA2"]): return 0.610, 2
-        if "SU2" in desc: return 0.660, 2
-        if "42QR" in desc or "P42QR" in desc or "W42JK" in desc: return 0.760, 2
-        if "F44" in desc or "F48" in desc: return 0.660, 2
-        if "5H45V" in desc: return 0.670, 2
-        if "KN6 #6" in desc or "KN9 #6" in desc: return 0.760, 1
-        
+        if "16XHP" in text_to_check and "123T" in text_to_check: return 1.041, 2
+        if "27XHP" in text_to_check and any(kw in text_to_check for kw in ["64T", "73T", "123T"]): return 0.887, 2
+        if "12XHP" in text_to_check and "SU2" in text_to_check: return 0.660, 2
+        if "CMFB" in text_to_check: return 0.640, 2
+        if "D15B" in text_to_check: return 0.610, 2
+        if "DNGA" in text_to_check and not any(kw in text_to_check for kw in ["DNGA1", "DNGA2"]): return 0.610, 2
+        if "SU2" in text_to_check: return 0.660, 2
+        if "42QR" in text_to_check or "P42QR" in text_to_check or "W42JK" in text_to_check: return 0.760, 2
+        if "F44" in text_to_check or "F48" in text_to_check: return 0.660, 2
+        if "5H45V" in text_to_check: return 0.670, 2
+        if "KN6 #6" in text_to_check or "KN9 #6" in text_to_check: return 0.760, 1
         return 0.790, 2 
 
     elif furnace_id == "NB2":
-        # -- Heater Core (TAHC/UTAHC) Specific --
-        if "P13C" in desc: return 0.370, 4
-        if "SFTP" in desc or "KAMAZ" in desc: return 0.380, 3
-        
+        if "P13C" in text_to_check: return 0.370, 4
+        if "SFTP" in text_to_check or "KAMAZ" in text_to_check: return 0.380, 3
         return 0.380, 4
 
     elif furnace_id == "NB3":
         # -- BTM: 1 Piece per pitch --
-        if any(kw in desc for kw in ["XC2C", "4L45V"]): return 1.400, 1
+        if any(kw in text_to_check for kw in ["XC2C", "4L45V"]): return 1.400, 1
         
         # -- BTM: 2 Pieces per pitch --
-        if "M48" in desc: return 1.435, 2
+        if "M48" in text_to_check: return 1.435, 2
         
         # -- BTM: 3 Pieces per pitch --
-        if "T625769" in desc or "P33B" in desc: return 1.400, 3
+        if "T625769" in text_to_check or "P33B" in text_to_check: return 1.400, 3
         
         # -- BTM: 4 Pieces per pitch --
-        if any(kw in desc for kw in ["N175", "OUTLANDER", "ATA44035", "T175297", "T47938C", "T47955C"]): return 1.260, 4
-        if any(kw in desc for kw in ["N173", "KEI EV", "AT425115", "AT425220", "T425109", "T425224", "T425259"]): return 1.400, 4
+        if any(kw in text_to_check for kw in ["N175", "OUTLANDER", "ATA44035", "T175297", "T47938C", "T47955C"]): return 1.260, 4
+        if any(kw in text_to_check for kw in ["N173", "KEI EV", "AT425115", "AT425220", "T425109", "T425224", "T425259"]): return 1.400, 4
         
         # -- Evaporator & Corion --
-        if "KE8" in desc: return 0.370, 3
-        if any(kw in desc for kw in ["NX5", "J4LL", "J2LL", "D2LL"]): return 0.363, 2
-        if "RBC" in desc or "D12A" in desc: return 0.363, 3
-        if "U825" in desc or "EMK" in desc: return 0.513, 3
+        if "KE8" in text_to_check: return 0.370, 3
+        if any(kw in text_to_check for kw in ["NX5", "J4LL", "J2LL", "D2LL"]): return 0.363, 2
+        if "RBC" in text_to_check or "D12A" in text_to_check: return 0.363, 3
+        if "U825" in text_to_check or "EMK" in text_to_check: return 0.513, 3
         
-        # Default สำหรับ NB3 (EVO/Corion/Evaporator ส่วนใหญ่) อยู่ที่ 463 mm (0.463 m) / 3 cores (รวม A5, P1MM, Dummy, A669223C ด้วย)
+        # Default สำหรับ NB3
         return 0.463, 3
         
     return 0.660, 2
@@ -323,7 +318,6 @@ if not df_schedule_raw.empty:
             # --- คำนวณจุดเริ่มต้นรายโมเดลอัตโนมัติ (Per-Model Start Offset) ---
             model_start_offset = 0.0
             if current_nb == "NB3":
-                # เพิ่ม Keywords อ้างอิงตามรูปให้ครอบคลุม BTM และ Corion ทั้งหมด (อัปเดตใหม่)
                 btm_corion_kws = [
                     "BTM", "CORION", 
                     "AT425115", "AT425220", "ATA44035", "M48", "N173", "N175", "XC2C", 
@@ -331,15 +325,13 @@ if not df_schedule_raw.empty:
                     "T47955C", "T625769", "KEI EV", "P33B", "OUTLANDER", 
                     "A5", "A5+", "A5@", "P1MM", "DUMMY EVAP", "A669223C", "KE8"
                 ]
-                # ตรวจสอบทั้งช่อง Description และ Reference
                 if any(kw in desc_upper for kw in btm_corion_kws) or any(kw in ref_upper for kw in btm_corion_kws):
-                    # ข้าม Entrance (0.90) และ Fluxer (4.05) รวมเป็น 4.95 เมตร เริ่มตกที่ XFER พอดี
                     model_start_offset = 4.95
-                    # บวกค่า Epsilon เล็กน้อยเพื่อให้ค่าน้อยกว่า XFER ตกอยู่ในโซน XFER แน่นอนสำหรับการประมวลผลตาราง
                     model_start_offset += 0.001 
             # -----------------------------------------------------------
 
-            pitch_m, pieces_per_pitch = get_model_info(desc, current_nb)
+            # ส่งทั้ง desc และ ref เข้าไปให้ get_model_info พิจารณา
+            pitch_m, pieces_per_pitch = get_model_info(desc, ref, current_nb)
             interval_s = pitch_m / belt_speed_ms
             
             rows_to_load = int(math.ceil(qty / pieces_per_pitch))
@@ -367,9 +359,7 @@ if not df_schedule_raw.empty:
         if not df_pieces.empty:
             df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
             
-            # การคำนวณระยะทางที่เหลือ (เช่น BTM จะเป็น 44.13 - 4.95 = 39.18 เมตร)
             df_pieces['Remaining_Dist'] = total_furnace_length - df_pieces['Start_Offset_m']
-            # เวลาที่ออกจากเตาจะใช้ระยะทางที่เหลือหารความเร็ว
             df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(df_pieces['Remaining_Dist'] / df_pieces['Speed_ms'], unit='s')
             
             df_pieces['Display_Model'] = df_pieces.apply(
@@ -419,7 +409,6 @@ if not df_pieces.empty:
     
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
     
-    # อิงตำแหน่งตาม Start Offset ของแต่ละชิ้น 
     df_pieces['Position'] = df_pieces['Start_Offset_m'] + (df_pieces['Elapsed_s'] * df_pieces['Speed_ms'])
     
     df_current = df_pieces[(df_pieces['Position'] >= df_pieces['Start_Offset_m']) & (df_pieces['Position'] <= total_furnace_length)].copy()
@@ -445,7 +434,6 @@ else:
     st.info("💡 **ข้อมูลการโหลดชิ้นงานยังว่างเปล่า** อัปโหลดไฟล์ Excel ด้านบนเพื่อดูตำแหน่งจริงและเวลาที่สัมพันธ์กัน")
     
     pitch_m = 0.660
-    # แสดงตำแหน่งเริ่มต้นให้สัมพันธ์กับเตา NB3
     start_pos = 4.95 if current_nb == "NB3" else 0.0
     product_positions = np.arange(start_pos, total_furnace_length, pitch_m)
     fig.add_trace(go.Scatter(
@@ -577,7 +565,6 @@ if not df_pieces.empty:
         
         wip_pivot = wip_pivot.reindex(columns=all_zone_labels, fill_value=0)
         
-        # --- คำนวณผลรวมรายโซน และผลรวมทั้งหมด ---
         wip_pivot.loc['Total (รวม)'] = wip_pivot.sum(numeric_only=True)
         grand_total = int(wip_pivot.loc['Total (รวม)'].sum())
         
