@@ -55,7 +55,7 @@ def detect_furnace_from_dataframe(df):
     return max(scores, key=scores.get)
 
 # ==============================================================================
-# 3. ฐานข้อมูลโซนของเตา (Zone Lengths) - แก้ไขชื่อโซน Heating
+# 3. ฐานข้อมูลโซนของเตา (Zone Lengths) - อัปเดตชื่อโซนตามที่แก้ไข (Brazing / NB2 XFER)
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
@@ -75,8 +75,8 @@ FURNACE_ZONE_DATA = {
     ],
     "NB2": [
         {"name": "Entrance", "len": 2.00, "type": "Entrance"}, {"name": "Flux spray", "len": 4.70, "type": "Flux"},
-        {"name": "Xfer 2", "len": 2.50, "type": "Xfer"}, {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
-        {"name": "DryOFF-Z#2", "len": 2.83, "type": "Dryer"}, {"name": "Xfer1", "len": 3.00, "type": "Xfer"},
+        {"name": "XFER", "len": 2.50, "type": "Xfer"}, {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
+        {"name": "DryOFF-Z#2", "len": 2.83, "type": "Dryer"}, {"name": "XFER#1", "len": 3.00, "type": "Xfer"},
         {"name": "Brazing Z#1", "len": 3.65, "type": "Heating"}, {"name": "Brazing Z#2", "len": 2.68, "type": "Heating"},
         {"name": "Brazing Z#3", "len": 2.36, "type": "Heating"}, {"name": "Brazing Z#4", "len": 2.02, "type": "Heating"},
         {"name": "Brazing Z#5", "len": 2.01, "type": "Heating"}, {"name": "Brazing Z#6", "len": 1.84, "type": "Heating"},
