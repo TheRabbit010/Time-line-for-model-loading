@@ -142,10 +142,18 @@ def get_model_info(description, furnace_id):
         return 0.380, 4
 
     elif furnace_id == "NB3":
-        # -- BTM (Battery Thermal Management) --
-        if "N173" in desc or "KEI EV" in desc: return 1.400, 4
-        if "N175" in desc or "OUTLANDER" in desc: return 1.260, 4
+        # -- BTM: 1 Piece per pitch --
+        if any(kw in desc for kw in ["XC2C", "4L45V"]): return 1.400, 1
+        
+        # -- BTM: 2 Pieces per pitch --
         if "M48" in desc: return 1.435, 2
+        
+        # -- BTM: 3 Pieces per pitch --
+        if "T625769" in desc or "P33B" in desc: return 1.400, 3
+        
+        # -- BTM: 4 Pieces per pitch --
+        if any(kw in desc for kw in ["N175", "OUTLANDER", "ATA44035", "T175297", "T47938C", "T47955C"]): return 1.260, 4
+        if any(kw in desc for kw in ["N173", "KEI EV", "AT425115", "AT425220", "T425109", "T425224", "T425259"]): return 1.400, 4
         
         # -- Evaporator & Corion --
         if "KE8" in desc: return 0.370, 3
@@ -153,6 +161,7 @@ def get_model_info(description, furnace_id):
         if "RBC" in desc or "D12A" in desc: return 0.363, 3
         if "U825" in desc or "EMK" in desc: return 0.513, 3
         
+        # Default สำหรับ NB3 (EVO/Corion/Evaporator ส่วนใหญ่) อยู่ที่ 463 mm (0.463 m) / 3 cores (รวม A5, P1MM, Dummy, A669223C ด้วย)
         return 0.463, 3
         
     return 0.660, 2
