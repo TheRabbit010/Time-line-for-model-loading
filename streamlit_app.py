@@ -55,7 +55,7 @@ def detect_furnace_from_dataframe(df):
     return max(scores, key=scores.get)
 
 # ==============================================================================
-# 3. ฐานข้อมูลโซนของเตา (Zone Lengths)
+# 3. ฐานข้อมูลโซนของเตา (Zone Lengths) - แก้ไขชื่อโซน Heating
 # ==============================================================================
 FURNACE_ZONE_DATA = {
     "NB1": [
@@ -65,10 +65,10 @@ FURNACE_ZONE_DATA = {
         {"name": "ENT DB", "len": 0.68, "type": "Debinder"}, {"name": "DB Z#1", "len": 3.10, "type": "Debinder"},
         {"name": "DB Z#2", "len": 2.60, "type": "Debinder"}, {"name": "DB Z#3", "len": 2.60, "type": "Debinder"},
         {"name": "DB Z#4", "len": 3.10, "type": "Debinder"}, {"name": "XFER#1", "len": 3.00, "type": "Xfer"},
-        {"name": "Z#1", "len": 3.65, "type": "Heating"}, {"name": "Z#2", "len": 2.68, "type": "Heating"},
-        {"name": "Z#3", "len": 2.36, "type": "Heating"}, {"name": "Z#4", "len": 2.02, "type": "Heating"},
-        {"name": "Z#5", "len": 2.01, "type": "Heating"}, {"name": "Z#6", "len": 1.84, "type": "Heating"},
-        {"name": "Z#7", "len": 2.81, "type": "Heating"}, {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
+        {"name": "Brazing Z#1", "len": 3.65, "type": "Heating"}, {"name": "Brazing Z#2", "len": 2.68, "type": "Heating"},
+        {"name": "Brazing Z#3", "len": 2.36, "type": "Heating"}, {"name": "Brazing Z#4", "len": 2.02, "type": "Heating"},
+        {"name": "Brazing Z#5", "len": 2.01, "type": "Heating"}, {"name": "Brazing Z#6", "len": 1.84, "type": "Heating"},
+        {"name": "Brazing Z#7", "len": 2.81, "type": "Heating"}, {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
         {"name": "WatCool#2", "len": 1.41, "type": "Cooling"}, {"name": "Exit curtain", "len": 2.29, "type": "Cooling"},
         {"name": "XFER#2", "len": 0.22, "type": "Cooling"}, {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
         {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
@@ -77,10 +77,10 @@ FURNACE_ZONE_DATA = {
         {"name": "Entrance", "len": 2.00, "type": "Entrance"}, {"name": "Flux spray", "len": 4.70, "type": "Flux"},
         {"name": "Xfer 2", "len": 2.50, "type": "Xfer"}, {"name": "DryOFF-Z#1", "len": 2.83, "type": "Dryer"},
         {"name": "DryOFF-Z#2", "len": 2.83, "type": "Dryer"}, {"name": "Xfer1", "len": 3.00, "type": "Xfer"},
-        {"name": "Z#1", "len": 3.65, "type": "Heating"}, {"name": "Z#2", "len": 2.68, "type": "Heating"},
-        {"name": "Z#3", "len": 2.36, "type": "Heating"}, {"name": "Z#4", "len": 2.02, "type": "Heating"},
-        {"name": "Z#5", "len": 2.01, "type": "Heating"}, {"name": "Z#6", "len": 1.84, "type": "Heating"},
-        {"name": "Z#7", "len": 2.81, "type": "Heating"}, {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
+        {"name": "Brazing Z#1", "len": 3.65, "type": "Heating"}, {"name": "Brazing Z#2", "len": 2.68, "type": "Heating"},
+        {"name": "Brazing Z#3", "len": 2.36, "type": "Heating"}, {"name": "Brazing Z#4", "len": 2.02, "type": "Heating"},
+        {"name": "Brazing Z#5", "len": 2.01, "type": "Heating"}, {"name": "Brazing Z#6", "len": 1.84, "type": "Heating"},
+        {"name": "Brazing Z#7", "len": 2.81, "type": "Heating"}, {"name": "WatCool#1", "len": 2.39, "type": "Cooling"},
         {"name": "WatCool#2", "len": 1.41, "type": "Cooling"}, {"name": "Exit curtain", "len": 2.29, "type": "Cooling"},
         {"name": "XFER#2", "len": 0.22, "type": "Cooling"}, {"name": "Air Cool#1", "len": 1.25, "type": "Cooling"},
         {"name": "Air Cool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
@@ -89,10 +89,10 @@ FURNACE_ZONE_DATA = {
         {"name": "Entrance", "len": 0.90, "type": "Entrance"}, {"name": "Fluxer", "len": 4.05, "type": "Flux"},
         {"name": "XFER", "len": 2.52, "type": "Xfer"}, {"name": "Dryer#1", "len": 1.88, "type": "Dryer"},
         {"name": "Dryer#2", "len": 1.88, "type": "Dryer"}, {"name": "Dryer#3", "len": 1.88, "type": "Dryer"},
-        {"name": "XFER#1", "len": 3.00, "type": "Xfer"}, {"name": "Z#1", "len": 3.65, "type": "Heating"},
-        {"name": "Z#2", "len": 2.68, "type": "Heating"}, {"name": "Z#3", "len": 2.36, "type": "Heating"},
-        {"name": "Z#4", "len": 2.02, "type": "Heating"}, {"name": "Z#5", "len": 2.01, "type": "Heating"},
-        {"name": "Z#6", "len": 1.84, "type": "Heating"}, {"name": "Z#7", "len": 2.81, "type": "Heating"},
+        {"name": "XFER#1", "len": 3.00, "type": "Xfer"}, {"name": "Brazing Z#1", "len": 3.65, "type": "Heating"},
+        {"name": "Brazing Z#2", "len": 2.68, "type": "Heating"}, {"name": "Brazing Z#3", "len": 2.36, "type": "Heating"},
+        {"name": "Brazing Z#4", "len": 2.02, "type": "Heating"}, {"name": "Brazing Z#5", "len": 2.01, "type": "Heating"},
+        {"name": "Brazing Z#6", "len": 1.84, "type": "Heating"}, {"name": "Brazing Z#7", "len": 2.81, "type": "Heating"},
         {"name": "WatCool#1", "len": 2.39, "type": "Cooling"}, {"name": "WatCool#2", "len": 1.41, "type": "Cooling"},
         {"name": "Exit curtain", "len": 2.50, "type": "Cooling"}, {"name": "AirCool#1", "len": 1.25, "type": "Cooling"},
         {"name": "AirCool#2", "len": 1.25, "type": "Cooling"}, {"name": "Exit", "len": 1.85, "type": "Exit"}
@@ -447,21 +447,20 @@ y_range = [-0.5, 2.5]
 
 if img_file_sim and os.path.exists(img_file_sim):
     img = Image.open(img_file_sim)
-    # ปรับขนาดภาพให้ใหญ่ขึ้น (sizey) และยกตำแหน่งขึ้น (y)
     fig.add_layout_image(
         dict(
             source=img, xref="x", yref="y",
-            x=0, y=5.0, sizex=total_furnace_length, sizey=3.5, # <- แก้ไขจุดนี้
+            x=0, y=5.0, sizex=total_furnace_length, sizey=3.5,
             sizing="stretch", opacity=1, layer="above"
         )
     )
-    y_range = [-0.5, 5.5] # <- ขยายแกน y ให้ครอบคลุมภาพทั้งหมด
+    y_range = [-0.5, 5.5] 
 
 fig.update_layout(
     title=f"Furnace Timeline: {current_nb} (Total Length: {total_furnace_length:.2f} m)",
     xaxis=dict(title="Distance (Meters)", range=[0, total_furnace_length], tickmode="linear", tick0=0, dtick=2),
     yaxis=dict(visible=False, range=y_range),
-    height=700, # <- เพิ่มความสูงรวมของกราฟให้มีพื้นที่มากขึ้น
+    height=700, 
     margin=dict(l=20, r=20, t=50, b=120), 
     template="plotly_white", hovermode="x unified",
     showlegend=True, 
