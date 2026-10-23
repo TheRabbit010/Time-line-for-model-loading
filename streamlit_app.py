@@ -111,7 +111,7 @@ IMAGE_MAPPING = {
 }
 
 # ==============================================================================
-# 4. ฐานข้อมูล Model Pitch และ Pieces per Pitch (ปรับให้อ่านทั้ง Desc และ Ref)
+# 4. ฐานข้อมูล Model Pitch และ Pieces per Pitch
 # ==============================================================================
 def get_model_info(description, reference, furnace_id):
     # นำ Description และ Reference มาต่อกันเพื่อใช้ตรวจสอบเงื่อนไขทั้งหมด
@@ -185,7 +185,7 @@ st.title("🔥 Furnace Product & Simulation")
 st.markdown("ระบบจำลองตำแหน่งชิ้นงานในเตาอบประสาน (Brazing Furnace) โดยอ้างอิงจากแผนการโหลดชิ้นงานจริง")
 
 # ==============================================================================
-# 6. อัปโหลดและเตรียมข้อมูล Excel (มีปุ่ม Reset Data)
+# 6. อัปโหลดและเตรียมข้อมูล Excel
 # ==============================================================================
 st.markdown("### 📥 2. อัปโหลดแผนการผลิต (Excel)")
 
@@ -330,7 +330,6 @@ if not df_schedule_raw.empty:
                     model_start_offset += 0.001 
             # -----------------------------------------------------------
 
-            # ส่งทั้ง desc และ ref เข้าไปให้ get_model_info พิจารณา
             pitch_m, pieces_per_pitch = get_model_info(desc, ref, current_nb)
             interval_s = pitch_m / belt_speed_ms
             
@@ -444,31 +443,32 @@ else:
     ))
 
 img_file_sim = IMAGE_MAPPING.get(current_nb)
-y_range = [-0.2, 1.8] 
+y_range = [-0.5, 2.5] 
 
 if img_file_sim and os.path.exists(img_file_sim):
     img = Image.open(img_file_sim)
+    # ปรับขนาดภาพให้ใหญ่ขึ้น (sizey) และยกตำแหน่งขึ้น (y)
     fig.add_layout_image(
         dict(
             source=img, xref="x", yref="y",
-            x=0, y=3.2, sizex=total_furnace_length, sizey=1.6, 
+            x=0, y=5.0, sizex=total_furnace_length, sizey=3.5, # <- แก้ไขจุดนี้
             sizing="stretch", opacity=1, layer="above"
         )
     )
-    y_range = [-0.2, 3.5]
+    y_range = [-0.5, 5.5] # <- ขยายแกน y ให้ครอบคลุมภาพทั้งหมด
 
 fig.update_layout(
     title=f"Furnace Timeline: {current_nb} (Total Length: {total_furnace_length:.2f} m)",
     xaxis=dict(title="Distance (Meters)", range=[0, total_furnace_length], tickmode="linear", tick0=0, dtick=2),
     yaxis=dict(visible=False, range=y_range),
-    height=550, 
+    height=700, # <- เพิ่มความสูงรวมของกราฟให้มีพื้นที่มากขึ้น
     margin=dict(l=20, r=20, t=50, b=120), 
     template="plotly_white", hovermode="x unified",
     showlegend=True, 
     legend=dict(
         orientation="h", 
         yanchor="top", 
-        y=-0.25, 
+        y=-0.15, 
         xanchor="center", 
         x=0.5
     )
