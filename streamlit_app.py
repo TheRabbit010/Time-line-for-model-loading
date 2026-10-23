@@ -132,7 +132,6 @@ def get_model_info(description, furnace_id):
         if "5H45V" in desc: return 0.670, 2
         if "KN6 #6" in desc or "KN9 #6" in desc: return 0.760, 1
         
-        # Default สำหรับ NB1 ตาม Catalog ส่วนใหญ่อยู่ที่ 790 mm (0.790 m) / 2 cores
         return 0.790, 2 
 
     elif furnace_id == "NB2":
@@ -140,7 +139,6 @@ def get_model_info(description, furnace_id):
         if "P13C" in desc: return 0.370, 4
         if "SFTP" in desc or "KAMAZ" in desc: return 0.380, 3
         
-        # Default สำหรับ NB2 (TAHC/UTAHC/CHORA ส่วนใหญ่) อยู่ที่ 380 mm (0.380 m) / 4 cores
         return 0.380, 4
 
     elif furnace_id == "NB3":
@@ -155,7 +153,6 @@ def get_model_info(description, furnace_id):
         if "RBC" in desc or "D12A" in desc: return 0.363, 3
         if "U825" in desc or "EMK" in desc: return 0.513, 3
         
-        # Default สำหรับ NB3 (EVO/Corion/Evaporator/BTM Plate ส่วนใหญ่) อยู่ที่ 463 mm (0.463 m) / 3 cores
         return 0.463, 3
         
     return 0.660, 2
@@ -312,16 +309,24 @@ if not df_schedule_raw.empty:
             desc_upper = desc.upper()
             
             ref = str(row['Reference']) if 'Reference' in df_schedule.columns else ""
+            ref_upper = ref.upper()
             
             # --- คำนวณจุดเริ่มต้นรายโมเดลอัตโนมัติ (Per-Model Start Offset) ---
             model_start_offset = 0.0
             if current_nb == "NB3":
-                # ถ้ารุ่นมีคำว่า BTM, CORION, หรือ A669223C ให้ข้ามโซน Entrance และ Fluxer อัตโนมัติ
-                if any(kw in desc_upper for kw in ["BTM", "CORION", "A669223C"]):
-                    for z in FURNACE_ZONE_DATA["NB3"]:
-                        if z["name"] in ["Entrance", "Fluxer"]:
-                            model_start_offset += z["len"]
-                    # เพิ่มทศนิยมเล็กน้อย เพื่อให้ชิ้นงานไปตกในโซน XFER แน่นอนสำหรับการประมวลผลตาราง
+                # เพิ่ม Keywords อ้างอิงตามรูปให้ครอบคลุม BTM และ Corion ทั้งหมด (อัปเดตใหม่)
+                btm_corion_kws = [
+                    "BTM", "CORION", 
+                    "AT425115", "AT425220", "ATA44035", "M48", "N173", "N175", "XC2C", 
+                    "4L45V", "T175297", "T425109", "T425224", "T425259", "T47938C", 
+                    "T47955C", "T625769", "KEI EV", "P33B", "OUTLANDER", 
+                    "A5", "A5+", "A5@", "P1MM", "DUMMY EVAP", "A669223C", "KE8"
+                ]
+                # ตรวจสอบทั้งช่อง Description และ Reference
+                if any(kw in desc_upper for kw in btm_corion_kws) or any(kw in ref_upper for kw in btm_corion_kws):
+                    # ข้าม Entrance (0.90) และ Fluxer (4.05) รวมเป็น 4.95 เมตร เริ่มตกที่ XFER พอดี
+                    model_start_offset = 4.95
+                    # บวกค่า Epsilon เล็กน้อยเพื่อให้ค่าน้อยกว่า XFER ตกอยู่ในโซน XFER แน่นอนสำหรับการประมวลผลตาราง
                     model_start_offset += 0.001 
             # -----------------------------------------------------------
 
@@ -353,7 +358,9 @@ if not df_schedule_raw.empty:
         if not df_pieces.empty:
             df_pieces = df_pieces.sort_values('LoadTime').reset_index(drop=True)
             
+            # การคำนวณระยะทางที่เหลือ (เช่น BTM จะเป็น 44.13 - 4.95 = 39.18 เมตร)
             df_pieces['Remaining_Dist'] = total_furnace_length - df_pieces['Start_Offset_m']
+            # เวลาที่ออกจากเตาจะใช้ระยะทางที่เหลือหารความเร็ว
             df_pieces['ExitTime'] = df_pieces['LoadTime'] + pd.to_timedelta(df_pieces['Remaining_Dist'] / df_pieces['Speed_ms'], unit='s')
             
             df_pieces['Display_Model'] = df_pieces.apply(
@@ -403,7 +410,7 @@ if not df_pieces.empty:
     
     df_pieces['Elapsed_s'] = (pd.to_datetime(current_sim) - df_pieces['LoadTime']).dt.total_seconds()
     
-    # อิงตำแหน่งตาม Start Offset ของแต่ละชิ้น (บางรุ่นเริ่มจากหน้าเตา, บางรุ่นเริ่มที่ XFER)
+    # อิงตำแหน่งตาม Start Offset ของแต่ละชิ้น 
     df_pieces['Position'] = df_pieces['Start_Offset_m'] + (df_pieces['Elapsed_s'] * df_pieces['Speed_ms'])
     
     df_current = df_pieces[(df_pieces['Position'] >= df_pieces['Start_Offset_m']) & (df_pieces['Position'] <= total_furnace_length)].copy()
@@ -429,7 +436,9 @@ else:
     st.info("💡 **ข้อมูลการโหลดชิ้นงานยังว่างเปล่า** อัปโหลดไฟล์ Excel ด้านบนเพื่อดูตำแหน่งจริงและเวลาที่สัมพันธ์กัน")
     
     pitch_m = 0.660
-    product_positions = np.arange(0.0, total_furnace_length, pitch_m)
+    # แสดงตำแหน่งเริ่มต้นให้สัมพันธ์กับเตา NB3
+    start_pos = 4.95 if current_nb == "NB3" else 0.0
+    product_positions = np.arange(start_pos, total_furnace_length, pitch_m)
     fig.add_trace(go.Scatter(
         x=product_positions, y=[1.2] * len(product_positions),
         mode="markers", name="ตัวอย่าง (Sample Data)",
@@ -533,7 +542,7 @@ if not df_pieces.empty:
     )
     
     # ==============================================================================
-    # 11. ตารางรายละเอียดรายโซน (อัปเดตการแสดงผลไฮไลท์ช่องที่มีชิ้นงาน และเพิ่มผลรวม)
+    # 11. ตารางรายละเอียดรายโซน
     # ==============================================================================
     st.markdown(f"### 📋 รายละเอียดชิ้นงานรายโซน ณ เวลา **{st.session_state.current_sim_time.strftime('%Y-%m-%d %H:%M:%S')}**")
     
